@@ -20,6 +20,14 @@ class MoneyTestCase(unittest.TestCase):
     def assertDeserialize(self, cstruct, appstruct):
         self.assertEqual(self.node.deserialize(cstruct), appstruct)
 
+    def test_null_serialization(self):
+        self.assertSerialize(colander.null, colander.null)
+
+    def test_null_deserialization(self):
+        node = self.node.clone()
+        node.missing = colander.null
+        self.assertEqual(node.deserialize(colander.null), colander.null)
+
     def test_integer_serialization(self):
         self.assertSerialize(188, '18800')
 
@@ -33,20 +41,26 @@ class MoneyTestCase(unittest.TestCase):
         self.assertSerialize(Decimal('123.5'), '12350')
         self.assertSerialize(Decimal('123.56'), '12356')
 
-    def test_not_number(self):
-        "Obviously, non-numeric vaulues are invalid"
-        self.assertRaises(colander.Invalid, self.node.serialize, None)
-        self.assertRaises(colander.Invalid, self.node.serialize, 'notanumber')
-
-    def test_invalid_values(self):
-        "Values with more than two decimal places are invalid"
-        self.assertRaises(colander.Invalid, self.node.serialize, 100.123)
-        self.assertRaises(colander.Invalid, self.node.serialize, Decimal('200.543'))
-
     def test_deserialization(self):
         self.assertDeserialize('43200', Decimal('432.00'))
         self.assertDeserialize('87720', Decimal('877.2'))
         self.assertDeserialize('12311', Decimal('123.11'))
+
+    def test_non_numeric_values_serialization(self):
+        "Obviously, non-numeric vaulues are invalid"
+        self.assertRaises(colander.Invalid, self.node.serialize, None)
+        self.assertRaises(colander.Invalid, self.node.serialize, 'notanumber')
+        self.assertRaises(colander.Invalid, self.node.serialize, '42')
+
+    def test_non_numeric_values_deserialization(self):
+        "Obviously, non-numeric values will be invalid during deserialization"
+        self.assertRaises(colander.Invalid, self.node.deserialize, None)
+        self.assertRaises(colander.Invalid, self.node.deserialize, 'notanumber')
+
+    def test_invalid_monetary_values(self):
+        "Values with more than two decimal places are invalid"
+        self.assertRaises(colander.Invalid, self.node.serialize, 100.123)
+        self.assertRaises(colander.Invalid, self.node.serialize, Decimal('200.543'))
 
 
 # do not trust these
