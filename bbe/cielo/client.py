@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+import urllib2
+import contextlib
+from .schema import (
+    RequisicaoConsulta,
+    RequisicaoConsultaPedido,
+    RequisicaoCaptura,
+)
+from .message import Message
 
 class Client(object):
     """
@@ -75,22 +83,18 @@ class Client(object):
 
         try:
             # enviar a requisição e ler a resposta do webservice.
-            with contextlib.closing(urllib2.urlopen(self.url, data)) as response:
-                xml = response.read()
-                etree = fromstring(xml)
+            with contextlib.closing(urllib2.urlopen(self.url, data)) as r:
+                body = r.read()
         except urllib2.URLError, e:
             raise ErroComunicacao(e.reason)
-        except ParseError, e:
-            raise ErroAnalise(e)
 
-        remove_namespaces(etree)
-        root_tag = etree.tag
+        response = Message.fromstring(body)
 
-        if root_tag == 'erro':
+        if response.root_tag == 'erro':
             # o webservice retornou um erro. vamos tentar identificar a
             # classe do erro.
             schema = Erro.__schema__
-            cstruct = deetreeify(schema, etree)
+            cstruct = response.deserialize(schema)
             appstruct = schema.deserialize(cstruct)
             error_class = Erro.classe_por_codigo(appstruct['codigo'])
 

@@ -1,84 +1,13 @@
 # -*- coding: utf-8 -*-
-import re
 import uuid
 import urllib2
 import colander
-from itertools import chain
 from collections import OrderedDict
-from xml.etree.ElementTree import ParseError, ElementTree, Element, fromstring
+from itertools import chain
 from .schema import *
-
-try:
-    from cStringIO import StringIO
-except:
-    from StringIO import StringIO
 
 
 SERVICE_VERSION = '1.1.1'
-
-
-def tostring(etree):
-    s = StringIO()
-    etree.write(s)
-    return s.getvalue()
-
-
-def etreeify(schema, cstruct):
-    tag = getattr(schema, 'tag', schema.name)
-    ele = Element(tag)
-    if isinstance(schema.typ, colander.Mapping):
-        for child in schema.children:
-            value = cstruct.get(child.name, colander.null)
-            if value is not colander.null:
-                if getattr(child, 'attrib', False):
-                    attr = getattr(child, 'tag', child.name)
-                    ele.attrib[attr] = value
-                else:
-                    subele = etreeify(child, cstruct.get(child.name, colander.null))
-                    if subele is not None:
-                        ele.append(subele)
-        return ele
-    else:
-        if cstruct is colander.null:
-            return None
-        ele.text = cstruct
-        return ele
-
-
-def deetreeify(schema, etree):
-    if isinstance(schema.typ, colander.Mapping):
-        cstruct = {}
-        for child in schema.children:
-
-            if getattr(child, 'attrib', False):
-                attr = getattr(child, 'tag', child.name)
-                value = etree.attrib.get(attr, colander.null)
-            else:
-                tag = getattr(child, 'tag', child.name)
-                element = etree.find(tag)
-                if element is not None:
-                    value = deetreeify(child, element)
-                else:
-                    value = colander.null
-
-            if value is not colander.null:
-                cstruct[child.name] = value
-
-        return cstruct
-    else:
-        return etree.text
-
-
-def xmlify(schema, appstruct):
-    cstruct = schema.serialize(appstruct)
-    element = etreeify(schema, cstruct)
-    return tostring(ElementTree(element))
-
-
-def dexmlify(schema, xml):
-    etree = fromstring(xml)
-    cstruct = deetreeify(schema, etree)
-    return schema.deserialize(cstruct)
 
 
 def recursive_subclasses(cls):
@@ -86,17 +15,11 @@ def recursive_subclasses(cls):
     return set(subs) | set(chain(*(c.__subclasses__() for c in subs)))
 
 
-def remove_namespaces(element):
-    """Remove all namespaces in the passed element in place."""
-    for ele in element.getiterator():
-        ele.tag = re.sub(r'^\{[^\}]+\}', '', ele.tag)
-
-
 class ContentType(object):
     __schema__ = None
 
-    def serialize(self):
-        return xmlify(self.__schema__, self.appstruct())
+    #def serialize(self):
+    #    return xmlify(self.__schema__, self.appstruct())
 
     @classmethod
     def fromappstruct(cls, appstruct):
