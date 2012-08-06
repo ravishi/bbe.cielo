@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 import urllib2
 import contextlib
-from .schema import (
+from bbe.cielo import (
     RequisicaoConsulta,
     RequisicaoConsultaPedido,
     RequisicaoCaptura,
 )
-from .message import Message
 
 class Client(object):
     """

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
+import colander
 import uuid
 import urllib2
-import colander
 from collections import OrderedDict
 from itertools import chain
 from .schema import *
@@ -17,9 +17,6 @@ def recursive_subclasses(cls):
 
 class ContentType(object):
     __schema__ = None
-
-    #def serialize(self):
-    #    return xmlify(self.__schema__, self.appstruct())
 
     @classmethod
     def fromappstruct(cls, appstruct):

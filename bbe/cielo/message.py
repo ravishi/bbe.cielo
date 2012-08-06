@@ -1,115 +1,90 @@
-import re
 import colander
-from xml.etree.ElementTree import ParseError, ElementTree, Element, fromstring
+import contextlib
+from xml.etree.ElementTree import ElementTree, Element, fromstring
 
-# damn you, pyflakes! y u complain about this?
-from StringIO import StringIO
-#try:
-#    from cStringIO import StringIO
-#except:
-#    from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except:
+    from StringIO import StringIO
+
+
+def isattrib(node):
+    return getattr(node, 'attrib', False)
+
+
+def gettag(node):
+    return getattr(node, 'tag', node.name)
+
+
+def _build_element(node):
+    return Element(gettag(node))
 
 
 def serialize(schema, cstruct):
-    """Serialize a cstruct into a message."""
-    element = etreeify(schema, cstruct)
-    etree = ElementTree(element)
-    message = Message(etree_to_string(etree))
-    message._etree = etree
-    return message
+    if cstruct is colander.null:
+        return None
 
-
-def parse(message):
-    """Parse a message and convert it to a :class:``Message``"""
-    return Message.fromstring(message)
-
-
-class Message(object):
-    def serialize(self, schema):
-        """Generate a message."""
-
-    def deserialize(self, schema):
-        """Generate a ``cstruct``."""
-
-    @classmethod
-    def fromstring(cls, message):
-        """Parse ``message`` and build a new :class:`Message` instance.
-
-        May raise :exc:`ParseError`.
-        """
-        try:
-            etree = fromstring(message)
-        except ParseError:
-            pass
-
-        return cls(etree)
-
-
-def etree_to_string(etree):
-    s = StringIO()
-    etree.write(s)
-    return s.getvalue()
-
-
-def etreeify(schema, cstruct):
-    tag = getattr(schema, 'tag', schema.name)
-    ele = Element(tag)
     if isinstance(schema.typ, colander.Mapping):
-        for child in schema.children:
-            value = cstruct.get(child.name, colander.null)
-            if value is not colander.null:
-                if getattr(child, 'attrib', False):
-                    attr = getattr(child, 'tag', child.name)
-                    ele.attrib[attr] = value
-                else:
-                    subele = etreeify(child, cstruct.get(child.name, colander.null))
-                    if subele is not None:
-                        ele.append(subele)
-        return ele
+        return _serialize_mapping(schema, cstruct)
     else:
-        if cstruct is colander.null:
-            return None
-        ele.text = cstruct
-        return ele
+        element = _build_element(schema)
+        element.text = cstruct
+        return element
 
 
-def deetreeify(schema, etree):
-    if isinstance(schema.typ, colander.Mapping):
-        cstruct = {}
-        for child in schema.children:
+def _serialize_mapping(schema, cstruct):
+    element = _build_element(schema)
 
-            if getattr(child, 'attrib', False):
-                attr = getattr(child, 'tag', child.name)
-                value = etree.attrib.get(attr, colander.null)
+    for child in schema:
+        subtag = gettag(child)
+        subvalue = cstruct.get(child.name, colander.null)
+
+        if subvalue is colander.null:
+            continue
+
+        if isattrib(child):
+            element.attrib[subtag] = subvalue
+        else:
+            subelement = serialize(child, subvalue)
+            if subelement is not None:
+                element.append(subelement)
+
+    return element
+
+
+def deserialize(schema, etree):
+    if isinstance(schema, colander.Mapping):
+        return _deserialize_mapping(schema, etree)
+
+    if etree.text is None:
+        return colander.null
+
+    return etree.text
+
+
+def _deserialize_mapping(schema, etree):
+    cstruct = {}
+    for child in schema.children:
+        tag = gettag(child)
+        if isattrib(child):
+            value = etree.attrib.get(tag, colander.null)
+        else:
+            subelement = etree.find(tag)
+            if subelement is None:
+                value = colander.null
             else:
-                tag = getattr(child, 'tag', child.name)
-                element = etree.find(tag)
-                if element is not None:
-                    value = deetreeify(child, element)
-                else:
-                    value = colander.null
-
-            if value is not colander.null:
-                cstruct[child.name] = value
-
-        return cstruct
-    else:
-        return etree.text
+                value = deserialize(child, subelement)
+        cstruct[tag] = value
+    return cstruct
 
 
-def xmlify(schema, appstruct):
-    cstruct = schema.serialize(appstruct)
-    element = etreeify(schema, cstruct)
-    return tostring(ElementTree(element))
+def dumps(etree):
+    if not isinstance(etree, ElementTree):
+        etree = ElementTree(etree)
+    with contextlib.closing(StringIO()) as s:
+        etree.write(s)
+        return s.getvalue()
 
 
-def dexmlify(schema, xml):
-    etree = fromstring(xml)
-    cstruct = deetreeify(schema, etree)
-    return schema.deserialize(cstruct)
-
-
-def remove_namespaces(element):
-    """Remove all namespaces in the passed element in place."""
-    for ele in element.getiterator():
-        ele.tag = re.sub(r'^\{[^\}]+\}', '', ele.tag)
+def loads(string):
+    return fromstring(string)

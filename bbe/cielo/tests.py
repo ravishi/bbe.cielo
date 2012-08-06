@@ -10,6 +10,74 @@ def nextmonth():
     return datetime.datetime.now() + datetime.timedelta(days=30)
 
 
+class MessageSerializationTestCase(unittest.TestCase):
+    def assertDumps(self, node, appstruct, test):
+        cstruct = node.serialize(appstruct)
+        etree = cielo.message.serialize(node, cstruct)
+        s = cielo.message.dumps(etree)
+        return self.assertEqual(s, test)
+
+    def test_serialization(self):
+        node = colander.SchemaNode(colander.String(), name='node')
+        self.assertDumps(node, 'abcdef', '<node>abcdef</node>')
+
+    def test_serialization_with_tag(self):
+        node = colander.SchemaNode(colander.String(), name='node', tag='node-tag')
+        self.assertDumps(node, 'abcdef', '<node-tag>abcdef</node-tag>')
+
+    def test_subnode_serialization(self):
+        node = colander.SchemaNode(colander.Mapping(), name='node')
+        node.add(colander.SchemaNode(colander.String(), name='sub'))
+
+        self.assertDumps(node, {'sub': 'abcdef'}, '<node><sub>abcdef</sub></node>')
+
+    def test_subnode_serialization_order(self):
+        "Subnode serialization must follow schema's order"
+        node = colander.SchemaNode(colander.Mapping(), name='node')
+        node.add(colander.SchemaNode(colander.String(), name='a'))
+        node.add(colander.SchemaNode(colander.String(), name='b'))
+        node.add(colander.SchemaNode(colander.String(), name='c'))
+
+        appstruct = {'a': 'value-1', 'b': 'value-2', 'c': 'value-3'}
+
+        #self.assertNotEqual(appstruct.keys(), ['a', 'b', 'c'])
+        self.assertDumps(node, appstruct, '<node><a>value-1</a><b>value-2</b><c>value-3</c></node>')
+
+    def test_empty_mapping_serialization(self):
+        node = colander.SchemaNode(colander.Mapping(), name='node')
+        node.add(colander.SchemaNode(colander.String(), name='a'))
+        node.add(colander.SchemaNode(colander.String(), name='b'))
+        node.add(colander.SchemaNode(colander.String(), name='c'))
+        self.assertDumps(node, {}, '<node />')
+
+
+class MessageDeserializationTestCase(unittest.TestCase):
+    def assertLoads(self, node, message, test):
+        etree = cielo.message.loads(message)
+        cstruct = cielo.message.deserialize(node, etree)
+        appstruct = node.deserialize(cstruct)
+        return self.assertEqual(appstruct, test)
+
+    def test_serialization(self):
+        node = colander.SchemaNode(colander.String(), name='node')
+        self.assertLoads(node, '<node>abcdef</node>', 'abcdef')
+
+    def test_deserialization_with_tags(self):
+        node = colander.SchemaNode(colander.String(), name='node', tag='node-tag')
+        self.assertLoads(node, '<node-tag>abcdef</node-tag>', 'abcdef')
+
+    def test_subnode_deserialization(self):
+        node = colander.SchemaNode(colander.Mapping(), name='node')
+        node.add(colander.SchemaNode(colander.String(), name='sub'))
+        self.assertLoads(node, '<node><sub>abcdef</sub></node>', {'sub': 'abcdef'})
+
+    def test_empty_mapping_deserialization(self):
+        node = colander.SchemaNode(colander.Mapping(), name='node')
+        node.add(colander.SchemaNode(colander.String(), name='a'))
+        node.add(colander.SchemaNode(colander.String(), name='b'))
+        node.add(colander.SchemaNode(colander.String(), name='c'))
+        self.assertLoads(node, '<node />', {})
+
 class MoneyTestCase(unittest.TestCase):
     def setUp(self):
         self.node = colander.SchemaNode(cielo.Money())
