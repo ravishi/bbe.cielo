@@ -53,7 +53,7 @@ def _serialize_mapping(schema, cstruct):
 
 
 def deserialize(schema, etree):
-    if isinstance(schema, colander.Mapping):
+    if isinstance(schema.typ, colander.Mapping):
         return _deserialize_mapping(schema, etree)
 
     if etree.text is None:
@@ -74,7 +74,7 @@ def _deserialize_mapping(schema, etree):
                 value = colander.null
             else:
                 value = deserialize(child, subelement)
-        cstruct[tag] = value
+        cstruct[child.name] = value
     return cstruct
 
 
