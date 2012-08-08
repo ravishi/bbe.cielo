@@ -50,6 +50,13 @@ class MessageSerializationTestCase(unittest.TestCase):
         node.add(colander.SchemaNode(colander.String(), name='c'))
         self.assertDumps(node, {}, '<node />')
 
+    def test_null_mapping_serialization(self):
+        node = colander.SchemaNode(colander.Mapping(), name='node')
+        node.add(colander.SchemaNode(colander.String(), name='a'))
+        node.add(colander.SchemaNode(colander.String(), name='b'))
+        node.add(colander.SchemaNode(colander.String(), name='c'))
+        self.assertDumps(node, colander.null, '<node />')
+
 
 class MessageDeserializationTestCase(unittest.TestCase):
     def assertLoads(self, node, message, test):
@@ -72,11 +79,11 @@ class MessageDeserializationTestCase(unittest.TestCase):
         self.assertLoads(node, '<node><sub>abcdef</sub></node>', {'sub': 'abcdef'})
 
     def test_empty_mapping_deserialization(self):
-        node = colander.SchemaNode(colander.Mapping(), name='node', missing=colander.null)
-        node.add(colander.SchemaNode(colander.String(), name='a'))
-        node.add(colander.SchemaNode(colander.String(), name='b'))
-        node.add(colander.SchemaNode(colander.String(), name='c'))
-        self.assertLoads(node, '<node />', colander.null)
+        node = colander.SchemaNode(colander.Mapping(), name='node')
+        node.add(colander.SchemaNode(colander.String(), name='a', missing=colander.null))
+        node.add(colander.SchemaNode(colander.String(), name='b', missing=colander.null))
+        node.add(colander.SchemaNode(colander.String(), name='c', missing=colander.null))
+        self.assertLoads(node, '<node />', {'a': colander.null, 'b': colander.null, 'c': colander.null})
 
 class MoneyTestCase(unittest.TestCase):
     def setUp(self):
