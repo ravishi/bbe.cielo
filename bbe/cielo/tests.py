@@ -72,11 +72,11 @@ class MessageDeserializationTestCase(unittest.TestCase):
         self.assertLoads(node, '<node><sub>abcdef</sub></node>', {'sub': 'abcdef'})
 
     def test_empty_mapping_deserialization(self):
-        node = colander.SchemaNode(colander.Mapping(), name='node')
+        node = colander.SchemaNode(colander.Mapping(), name='node', missing=colander.null)
         node.add(colander.SchemaNode(colander.String(), name='a'))
         node.add(colander.SchemaNode(colander.String(), name='b'))
         node.add(colander.SchemaNode(colander.String(), name='c'))
-        self.assertLoads(node, '<node />', {})
+        self.assertLoads(node, '<node />', colander.null)
 
 class MoneyTestCase(unittest.TestCase):
     def setUp(self):

@@ -63,6 +63,10 @@ def deserialize(schema, etree):
 
 
 def _deserialize_mapping(schema, etree):
+    # we dont need to parse empty nodes (like <node />)
+    if etree.text is None and not etree.attrib and not etree.getchildren():
+        return colander.null
+
     cstruct = {}
     for child in schema.children:
         tag = gettag(child)
