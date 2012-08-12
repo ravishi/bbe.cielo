@@ -189,9 +189,20 @@ class MonolithicTestCase(TestCase):
                 <nsu>336508</nsu>
               </autorizacao>
             </transacao>""")
+        self.assertTrue(response.success)
         self.assertIsInstance(response, cielo.Transaction)
         self.assertEqual(response.status, 5)
 
+    def test_process_error_response(self):
+        response = self.client.process_response(
+            u"""<?xml version="1.0" encoding="ISO-8859-1"?>
+                <erro>
+                    <codigo>032</codigo>
+                    <mensagem>Valor de captura inválido</mensagem>
+                </erro>""")
+        self.assertFalse(response.success)
+        self.assertEqual(response.code, 32)
+        self.assertEqual(response.message, u"Valor de captura inválido")
 
     @unittest.skip("this is not finished yet")
     def test_transaction(self):

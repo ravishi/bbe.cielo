@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import datetime as mod_datetime
 import uuid
 import urllib2
 import contextlib
@@ -12,47 +11,25 @@ from bbe.cielo.schema import (
     CREDITO_A_VISTA,
     PARCELADO_ADMINISTRADORA,
     guess_response_schema,
+    DebitPayment,
 )
-from bbe.cielo.error import Error, UnknownResponse, CommunicationError
-
-DEFAULT_CURRENCY = '096'
 
 
-class Order(object):
-    def __init__(self, value, number=None, datetime=None,
-                 description=None, currency=DEFAULT_CURRENCY, language='PT'):
-        self.value = value
-        self.number = number
-        self.datetime = datetime or mod_datetime.datetime.now()
-        self.currency = currency
-        self.description = description
-        self.language = language
+class CommunicationError(urllib2.URLError):
+    """This exception is raised when the communication between
+    our client and the remote service fail.
 
-        if self.number is None:
-            self.number = self.unique_number()
+    .. attribute:: reason
 
-    def unique_number(self):
-        return '1'
-        #return str(uuid.uuid4())
+        The error reason. It can be a message or an instance of
+        another exception.
+    """
 
 
-class Payment(object):
-    def __init__(self, value, datetime, installments, card_brand, card_number,
-                 card_holder_name, card_expiration_date, card_security_code):
-        self.value = value
-        self.datetime = datetime
-        self.installments = installments
-        self.card_brand = card_brand
-        self.card_number = card_number
-        self.card_holder_name = card_holder_name
-        self.card_expiration_date = card_expiration_date
-        self.card_security_code = card_security_code
-
-
-class DebitPayment(Payment):
-    def __init__(self, *args, **kwargs):
-        kwargs.setdefault('installments', 1)
-        super(Payment, self).__init__(*args, **kwargs)
+class UnknownResponse(Exception):
+    """This is raised when our client don't know how to handle
+    the response.
+    """
 
 
 class Client(object):
@@ -145,8 +122,6 @@ class Client(object):
         # TODO specialized exception class?
         cstruct = message.deserialize(schema, response)
         response = schema.deserialize(cstruct)
+        response = schema.content_type.deserialize(response)
 
-        if isinstance(response, Error):
-            raise response
-        else:
-            return response
+        return response

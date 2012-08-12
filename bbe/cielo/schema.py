@@ -5,6 +5,9 @@ import colander
 from decimal import Decimal
 
 
+SERVICE_VERSION = '1.1.1'
+
+
 LANG_PT = 'PT'
 LANG_EN = 'EN'
 LANG_ES = 'ES'
@@ -61,6 +64,73 @@ STATUS = (
     ST_CANCELADA,
     ST_EM_AUTENTICACAO,
 )
+
+
+DEFAULT_CURRENCY = '096'
+
+
+class Order(object):
+    def __init__(self, value, number, datetime, description=None,
+                 currency=DEFAULT_CURRENCY, language='PT'):
+        self.value = value
+        self.number = number
+        self.datetime = datetime
+        self.currency = currency
+        self.description = description
+        self.language = language
+
+
+class Payment(object):
+    def __init__(self, value, datetime, installments, card_brand, card_number,
+                 card_holder_name, card_expiration_date, card_security_code):
+        self.value = value
+        self.datetime = datetime
+        self.installments = installments
+        self.card_brand = card_brand
+        self.card_number = card_number
+        self.card_holder_name = card_holder_name
+        self.card_expiration_date = card_expiration_date
+        self.card_security_code = card_security_code
+
+
+class DebitPayment(Payment):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('installments', 1)
+        super(Payment, self).__init__(*args, **kwargs)
+
+
+class Response(object):
+    @property
+    def success(self):
+        return not isinstance(self, Error)
+
+
+class Transaction(Response):
+    def __init__(self, order, status, authentication=None,
+                 authorization=None, capture=None, cancel=None, pan=None):
+        self.order = order
+        #self.payment = payment
+        self.status = status
+        self.authentication = authentication
+        self.authorization = authorization
+        self.capture = capture
+        self.cancel = cancel
+        self.pan = pan
+
+    @classmethod
+    def deserialize(cls, appstruct):
+        order = Order(**appstruct['order'])
+        return cls(order=order, status=appstruct['status'])
+
+
+class Error(Response):
+    def __init__(self, code, message):
+        self.code = code
+        self.message = message
+
+    @classmethod
+    def deserialize(cls, appstruct):
+        return cls(**appstruct)
 
 
 class SecurityCodeIndicator(colander.Integer):
@@ -419,25 +489,29 @@ class RequisicaoCapturaSchema(Raiz):
 
 
 class ErrorSchema(colander.Schema):
-    tag = 'error'
+    tag = 'erro'
+    content_type = Error
+
     code = colander.SchemaNode(colander.Integer(), tag='codigo')
     message = colander.SchemaNode(colander.String(), tag='mensagem')
 
 
 class TransactionSchema(Raiz):
     tag = 'transacao'
+    content_type = Transaction
+
     tid = colander.SchemaNode(colander.String())
-    pedido = OrderSchema(tag='dados-pedido')
-    pagamento = PaymentSchema(tag='forma-pagamento')
+    order = OrderSchema(tag='dados-pedido')
+    payment = PaymentSchema(tag='forma-pagamento')
     status = colander.SchemaNode(colander.Integer(), validator=colander.OneOf(STATUS))
-    autenticacao = AutenticacaoSchema(missing=colander.null)
-    autorizacao = AutorizacaoSchema(missing=colander.null)
-    captura = CapturaSchema(missing=colander.null)
-    cancelamento = CancelamentoSchema(missing=colander.null)
+    authentication = AutenticacaoSchema(tag='autenticacao', missing=colander.null)
+    authorization = AutorizacaoSchema(tag='autorizacao', missing=colander.null)
+    capture = CapturaSchema(tag='captura', missing=colander.null)
+    cancel = CancelamentoSchema(tag='cancelamento', missing=colander.null)
     pan = colander.SchemaNode(colander.String())
-    url_autenticacao = colander.SchemaNode(colander.String(),
-                                           tag='url-autenticacao',
-                                           missing=colander.null)
+    authentication_url = colander.SchemaNode(colander.String(),
+                                             tag='url-autenticacao',
+                                             missing=colander.null)
 
 
 def guess_response_schema(tag):
@@ -449,4 +523,4 @@ def guess_response_schema(tag):
         if not issubclass(value, colander.Schema):
             continue
         if getattr(value, 'tag', None) == tag:
-            return value(tag=value.tag)
+            return value(tag=value.tag, content_type=value.content_type)
