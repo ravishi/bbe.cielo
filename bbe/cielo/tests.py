@@ -193,7 +193,8 @@ class MonolithicTestCase(TestCase):
         self.assertEqual(response.status, 5)
 
 
-    def skip_test_transaction(self):
+    @unittest.skip("this is not finished yet")
+    def test_transaction(self):
         order = cielo.Order(value=Decimal('200.0'))
         payment = cielo.Payment(
             card_number='4551870000000183',
