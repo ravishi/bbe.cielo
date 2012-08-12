@@ -1,7 +1,7 @@
 import re
 import colander
 import contextlib
-from xml.etree.ElementTree import ElementTree, Element, fromstring
+from lxml import etree
 
 try:
     from cStringIO import StringIO
@@ -18,10 +18,15 @@ def gettag(node):
 
 
 def _build_element(node):
-    return Element(gettag(node))
+    return etree.Element(gettag(node))
 
 
 def serialize(schema, cstruct):
+    element = _serialize(schema, cstruct)
+    return etree.ElementTree(element)
+
+
+def _serialize(schema, cstruct):
     if cstruct is colander.null:
         return None
 
@@ -47,51 +52,57 @@ def _serialize_mapping(schema, cstruct):
         if isattrib(child):
             element.attrib[subtag] = subvalue
         else:
-            subelement = serialize(child, subvalue)
+            subelement = _serialize(child, subvalue)
             if subelement is not None:
                 element.append(subelement)
 
     return element
 
 
-def deserialize(schema, etree):
-    if isinstance(schema.typ, colander.Mapping):
-        return _deserialize_mapping(schema, etree)
+def deserialize(schema, tree):
+    element = tree.getroot()
+    return _deserialize(schema, element)
 
-    if etree.text is None:
+
+def _deserialize(schema, element):
+    if isinstance(schema.typ, colander.Mapping):
+        return _deserialize_mapping(schema, element)
+
+    if element.text is None:
         return colander.null
 
-    return etree.text
+    return element.text
 
 
-def _deserialize_mapping(schema, etree):
+def _deserialize_mapping(schema, element):
     cstruct = {}
     for child in schema.children:
         tag = gettag(child)
         if isattrib(child):
-            value = etree.attrib.get(tag, colander.null)
+            value = element.attrib.get(tag, colander.null)
         else:
-            subelement = etree.find(tag)
+            subelement = element.find(tag)
             if subelement is None:
                 value = colander.null
             else:
-                value = deserialize(child, subelement)
+                value = _deserialize(child, subelement)
         cstruct[child.name] = value
     return cstruct
 
 
-def dumps(etree):
-    if not isinstance(etree, ElementTree):
-        etree = ElementTree(etree)
+def dumps(tree):
+    #if isinstance(tree, etree.Element):
+    #    tree = etree.ElementTree(tree)
     with contextlib.closing(StringIO()) as s:
-        etree.write(s)
-        return s.getvalue()
+        tree.write(s)
+        return s.getvalue().replace(' />', '/>')
 
 
-def loads(string):
-    etree = fromstring(string)
-    remove_namespaces(etree)
-    return etree
+def loads(data):
+    element = etree.fromstring(data)
+    tree = etree.ElementTree(element)
+    remove_namespaces(tree)
+    return tree
 
 
 def remove_namespaces(element):
@@ -100,5 +111,5 @@ def remove_namespaces(element):
         ele.tag = re.sub(r'^\{[^\}]+\}', '', ele.tag)
 
 
-def get_root_tag(etree):
-    return etree.tag
+def get_root_tag(tree):
+    return tree.getroot().tag

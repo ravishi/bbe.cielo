@@ -48,14 +48,14 @@ class MessageSerializationTestCase(unittest.TestCase):
         node.add(colander.SchemaNode(colander.String(), name='a'))
         node.add(colander.SchemaNode(colander.String(), name='b'))
         node.add(colander.SchemaNode(colander.String(), name='c'))
-        self.assertDumps(node, {}, '<node />')
+        self.assertDumps(node, {}, '<node/>')
 
     def test_null_mapping_serialization(self):
         node = colander.SchemaNode(colander.Mapping(), name='node')
         node.add(colander.SchemaNode(colander.String(), name='a'))
         node.add(colander.SchemaNode(colander.String(), name='b'))
         node.add(colander.SchemaNode(colander.String(), name='c'))
-        self.assertDumps(node, colander.null, '<node />')
+        self.assertDumps(node, colander.null, '<node/>')
 
 
 class MessageDeserializationTestCase(unittest.TestCase):
@@ -83,7 +83,7 @@ class MessageDeserializationTestCase(unittest.TestCase):
         node.add(colander.SchemaNode(colander.String(), name='a', missing=colander.null))
         node.add(colander.SchemaNode(colander.String(), name='b', missing=colander.null))
         node.add(colander.SchemaNode(colander.String(), name='c', missing=colander.null))
-        self.assertLoads(node, '<node />', {'a': colander.null, 'b': colander.null, 'c': colander.null})
+        self.assertLoads(node, '<node/>', {'a': colander.null, 'b': colander.null, 'c': colander.null})
 
 class MoneyTestCase(unittest.TestCase):
     def setUp(self):
@@ -156,39 +156,40 @@ class TestCase(unittest.TestCase):
 
 class MonolithicTestCase(TestCase):
     def test_process_response(self):
-        response = self.client.process_response(u"""
-            <transacao versao="1.1.1" id="f71e286f-21f6-4abe-8999-cc200e585454" xmlns="http://ecommerce.cbmp.com.br">
-              <tid>100699306905227C1001</tid>
-              <pan>uv9yI5tkhX9jpuCt+dfrtoSVM4U3gIjvrcwMBfZcadE=</pan>
-              <dados-pedido>
-                <numero>1</numero>
-                <valor>20000</valor>
-                <moeda>96</moeda>
-                <data-hora>2012-08-11T08:48:23.659-03:00</data-hora>
-                <idioma>PT</idioma>
-              </dados-pedido>
-              <forma-pagamento>
-                <bandeira>visa</bandeira>
-                <produto>1</produto>
-                <parcelas>1</parcelas>
-              </forma-pagamento>
-              <status>5</status>
-              <autenticacao>
-                <codigo>5</codigo>
-                <mensagem>Transacao sem autenticacao</mensagem>
-                <data-hora>2012-08-11T08:48:23.695-03:00</data-hora>
-                <valor>20000</valor>
-                <eci>7</eci>
-              </autenticacao>
-              <autorizacao>
-                <codigo>5</codigo>
-                <mensagem>Autorização negada</mensagem>
-                <data-hora>2012-08-11T08:48:43.708-03:00</data-hora>
-                <valor>20000</valor>
-                <lr>999</lr>
-                <nsu>336508</nsu>
-              </autorizacao>
-            </transacao>""")
+        response = self.client.process_response(
+            u"""<?xml version="1.0" encoding="ISO-8859-1"?>
+                <transacao versao="1.1.1" id="f71e286f-21f6-4abe-8999-cc200e585454" xmlns="http://ecommerce.cbmp.com.br">
+                  <tid>100699306905227C1001</tid>
+                  <pan>uv9yI5tkhX9jpuCt+dfrtoSVM4U3gIjvrcwMBfZcadE=</pan>
+                  <dados-pedido>
+                    <numero>1</numero>
+                    <valor>20000</valor>
+                    <moeda>96</moeda>
+                    <data-hora>2012-08-11T08:48:23.659-03:00</data-hora>
+                    <idioma>PT</idioma>
+                  </dados-pedido>
+                  <forma-pagamento>
+                    <bandeira>visa</bandeira>
+                    <produto>1</produto>
+                    <parcelas>1</parcelas>
+                  </forma-pagamento>
+                  <status>5</status>
+                  <autenticacao>
+                    <codigo>5</codigo>
+                    <mensagem>Transacao sem autenticacao</mensagem>
+                    <data-hora>2012-08-11T08:48:23.695-03:00</data-hora>
+                    <valor>20000</valor>
+                    <eci>7</eci>
+                  </autenticacao>
+                  <autorizacao>
+                    <codigo>5</codigo>
+                    <mensagem>Autorização negada</mensagem>
+                    <data-hora>2012-08-11T08:48:43.708-03:00</data-hora>
+                    <valor>20000</valor>
+                    <lr>999</lr>
+                    <nsu>336508</nsu>
+                  </autorizacao>
+                </transacao>""".encode('iso-8859-1'))
         self.assertTrue(response.success)
         self.assertIsInstance(response, cielo.Transaction)
         self.assertEqual(response.status, 5)
@@ -199,7 +200,7 @@ class MonolithicTestCase(TestCase):
                 <erro>
                     <codigo>032</codigo>
                     <mensagem>Valor de captura inválido</mensagem>
-                </erro>""")
+                </erro>""".encode('iso-8859-1'))
         self.assertFalse(response.success)
         self.assertEqual(response.code, 32)
         self.assertEqual(response.message, u"Valor de captura inválido")

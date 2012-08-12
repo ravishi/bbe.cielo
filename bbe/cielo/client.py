@@ -105,10 +105,10 @@ class Client(object):
         except urllib2.URLError, e:
             raise CommunicationError(e.reason)
 
-        return self.process_response(response.decode('iso-8859-1'))
+        return self.process_response(response)
 
     def process_response(self, response):
-        response = message.loads(response.encode('utf-8'))
+        response = message.loads(response)
 
         # get the root type
         root_tag = message.get_root_tag(response)
