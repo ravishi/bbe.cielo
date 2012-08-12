@@ -205,26 +205,35 @@ class MonolithicTestCase(TestCase):
         self.assertEqual(response.code, 32)
         self.assertEqual(response.message, u"Valor de captura inválido")
 
-    @unittest.skip("this is not finished yet")
     def test_transaction(self):
-        order = cielo.Order(value=Decimal('200.0'))
+        order = cielo.Order(
+            value=Decimal('200.0'),
+            datetime=datetime.datetime.now(),
+            number='1',
+        )
         payment = cielo.Payment(
-            card_number='4551870000000183',
-            card_expiration_date=nextmonth(),
-            card_security_code='123',
-            card_holder_name='Joao da Silva',
-            card_brand=cielo.VISA,
+            brand=cielo.VISA,
             value=order.value,
             datetime=order.datetime,
             installments=1,
         )
-        self.client.create_transaction(
+        card = cielo.CardData(
+            number='4551870000000183',
+            expiration_date=nextmonth(),
+            security_code='123',
+            holder_name='Joao da Silva',
+        )
+
+        response = self.client.create_transaction(
+            card=card,
             order=order,
             payment=payment,
             authorize=3,
             capture=True,
             return_url='http://example.com',
         )
+
+        self.assertTrue(response.success)
 
 """
 As informações abaixo podem ser usadas pelo desenvolvedor durante o desenvolvimento da

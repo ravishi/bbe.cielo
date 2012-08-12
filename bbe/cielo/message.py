@@ -91,8 +91,6 @@ def _deserialize_mapping(schema, element):
 
 
 def dumps(tree):
-    #if isinstance(tree, etree.Element):
-    #    tree = etree.ElementTree(tree)
     with contextlib.closing(StringIO()) as sio:
         tree.write(sio)
         s =  sio.getvalue()

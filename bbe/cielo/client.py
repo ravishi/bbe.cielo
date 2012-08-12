@@ -41,8 +41,8 @@ class Client(object):
     def generate_transaction_id(self):
         return str(uuid.uuid4())
 
-    def create_transaction(self, order, payment,  authorize, capture, return_url=None):
-        if payment.card_security_code is None:
+    def create_transaction(self, order, card, payment, authorize, capture, return_url=None):
+        if card.security_code is None:
             code_indic = INEXISTENTE
         else:
             code_indic = INFORMADO
@@ -71,26 +71,29 @@ class Client(object):
                 'description': order.description,
                 'language': order.language,
             },
-            'holder': {
-                'number': payment.card_number,
-                'security_code': payment.card_security_code,
-                'security_code_indicator': code_indic,
-                'expiration_date': payment.card_expiration_date,
-                'holder_name': payment.card_holder_name,
-            },
             'payment': {
-                'card_brand': payment.card_brand,
+                'brand': payment.brand,
                 'product': product,
                 'installments': payment.installments,
             },
             'return_url': return_url,
             'authorize': authorize,
             'capture': capture,
-            'bin': payment.card_number[:6],
         }
 
+        if card is not None:
+            appstruct['holder'] = {
+                'number': card.number,
+                'security_code': card.security_code,
+                'security_code_indicator': code_indic,
+                'expiration_date': card.expiration_date,
+                'holder_name': card.holder_name,
+            }
+            appstruct['bin'] =  card.number[:6]
+
         schema = TransactionRequestSchema(tag='requisicao-transacao')
-        request = schema.serialize(appstruct)
+        cstruct = schema.serialize(appstruct)
+        request = message.serialize(schema, cstruct)
         request = message.dumps(request)
         return self.post_request(request)
 

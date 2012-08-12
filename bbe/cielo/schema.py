@@ -81,16 +81,19 @@ class Order(object):
 
 
 class Payment(object):
-    def __init__(self, value, datetime, installments, card_brand, card_number,
-                 card_holder_name, card_expiration_date, card_security_code):
+    def __init__(self, value, datetime, installments, brand):
         self.value = value
         self.datetime = datetime
         self.installments = installments
-        self.card_brand = card_brand
-        self.card_number = card_number
-        self.card_holder_name = card_holder_name
-        self.card_expiration_date = card_expiration_date
-        self.card_security_code = card_security_code
+        self.brand = brand
+
+
+class CardData(object):
+    def __init__(self, number, holder_name, expiration_date, security_code):
+        self.number = number
+        self.holder_name = holder_name
+        self.expiration_date = expiration_date
+        self.security_code = security_code
 
 
 class DebitPayment(Payment):
@@ -358,9 +361,9 @@ class PaymentSchema(colander.Schema):
     forma-pagamento.parcelas    N   R   1..3    Número de parcelas. Para crédito à vista ou
                                                 débito, utilizar 1.
     """
-    card_brand = colander.SchemaNode(colander.String(),
-                                     tag='bandeira',
-                                     validator=colander.OneOf(CARD_BRANDS))
+    brand = colander.SchemaNode(colander.String(),
+                                tag='bandeira',
+                                validator=colander.OneOf(CARD_BRANDS))
     product = colander.SchemaNode(colander.String(),
                                   tag='produto',
                                   validator=colander.OneOf(PRODUCTS))
