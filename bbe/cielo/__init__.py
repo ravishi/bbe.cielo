@@ -5,6 +5,7 @@ import urllib2
 from collections import OrderedDict
 from itertools import chain
 from .schema import *
+from .client import Client, Order, Payment, DebitPayment
 
 
 SERVICE_VERSION = '1.1.1'
@@ -41,59 +42,6 @@ class ContentType(object):
                 value = value.appstruct()
             appstruct[child.name] = value
         return appstruct
-
-
-class Estabelecimento(ContentType):
-    __schema__ = EstabelecimentoSchema()
-
-    def __init__(self, numero, chave):
-        self.numero = numero
-        self.chave = chave
-
-
-class Portador(ContentType):
-    __schema__ = PortadorSchema()
-
-    def __init__(self, numero, validade, codigo_seguranca, nome=None):
-        self.numero = numero
-        self.validade = validade
-        self.nome = nome
-
-        if codigo_seguranca == NAO_INFORMADO:
-            self._indicador = NAO_INFORMADO
-        elif codigo_seguranca == ILEGIVEL:
-            self._indicador = ILEGIVEL
-        elif codigo_seguranca == INEXISTENTE:
-            self._indicador = INEXISTENTE
-        else:
-            self.codigo_seguranca = codigo_seguranca
-            self._indicador = INFORMADO
-
-    @property
-    def indicador(self):
-        return self._indicador
-
-
-class Pedido(ContentType):
-    __schema__ = PedidoSchema()
-
-    def __init__(self, numero, valor, data, descricao=None,
-                 idioma='PT', moeda=986):
-        self.numero = numero
-        self.valor = valor
-        self.data = data
-        self.descricao = descricao
-        self.idioma = idioma
-        self.moeda = moeda
-
-
-class FormaPagamento(ContentType):
-    __schema__ = FormaPagamentoSchema()
-
-    def __init__(self, bandeira, produto, parcelas=1):
-        self.bandeira = bandeira
-        self.produto = produto
-        self.parcelas = parcelas
 
 
 class Autenticacao(ContentType):
@@ -226,26 +174,6 @@ class Requisicao(ConteudoRaiz):
         super(Requisicao, self).__init__(*args, **kwargs)
 
 
-class RequisicaoTransacao(Requisicao):
-    __schema__ = RequisicaoTransacaoSchema(name='requisicao-transacao')
-
-    def __init__(self, ec, pedido, pagamento, url_retorno, autorizar,
-                 capturar, portador=None, *args, **kwargs):
-        self.pedido = pedido
-        self.pagamento = pagamento
-        self.url_retorno = url_retorno
-        self.autorizar = autorizar
-        self.capturar = capturar
-        self.portador = portador or colander.null
-
-        super(RequisicaoTransacao, self).__init__(ec, *args, **kwargs)
-
-    @property
-    def bin(self):
-        if self.portador:
-            return self.portador.numero[:6]
-
-
 class RequisicaoConsulta(Requisicao):
     """
     Consulta via TID
@@ -287,8 +215,6 @@ class RequisicaoConsultaPedido(Requisicao):
     Caso a loja virtual possua mais de uma transação para um mesmo número do
     pedido, retorna-se a transação mais recente apenas.
     """
-    __schema__ = RequisicaoConsultaPedidoSchema(name='requisicao-consulta-chsec')
-
     def __init__(self, ec, numero_pedido, *args, **kwargs):
         super(RequisicaoConsultaPedido, self).__init__(ec, *args, **kwargs)
         self.numero_pedido = numero_pedido
@@ -332,80 +258,3 @@ class RequisicaoCaptura(Requisicao):
         self.anexo = anexo
 
 
-# ==========================================================================
-# Erros
-
-class ErroComunicacao(urllib2.URLError):
-    """
-    O cliente levanta esta exceção quando ocorre algum problema de comunicação.
-    Esta é uma subclasse de :class:`urllib2.URLError`.
-
-    .. attribute:: reason
-
-        O motivo deste erro. Pode ser uma string de uma mensagem ou uma
-        instância de outra exceção.
-    """
-    def __init__(self, reason):
-        super(ErroComunicacao, self).__init__(reason)
-
-
-class ErroAnalise(Exception):
-    """
-    O cliente levanta esta exceção quando não consegue interpretar a resposta
-    obtida como um XML válido.
-
-    .. attribute:: reason
-
-        O motivo deste erro. Pode ser uma string de mensagem ou uma instância
-        de outra exceção.
-    """
-    def __init__(self, reason):
-        self.reason = reason
-        super(ErroAnalise, self).__init__(reason)
-
-
-class RespostaDesconhecida(ErroAnalise):
-    """
-    O cliente levanta esta exceção quando recebe como resposta um XML
-    válido, mas não consegue encontrar uma classe correspodente.
-    Neste caso, provavelmente se trata de alguma funcionalidade do
-    webservice que não foi considerada durante o desenvolvimento,
-    mas pode ser introduzida em uma versão posterior.
-    """
-
-
-class Erro(Exception, ContentType):
-    """
-    Classe base de todos os erros retornados pelo webservice remoto.
-    """
-    __schema__ = ErroSchema(name='erro')
-
-    def __init__(self, codigo, mensagem):
-        self.codigo = codigo
-        self.mensagem = mensagem
-
-        exc_msg = (u"erro %d: %s" % (self.codigo, self.mensagem))
-        exc_msg = exc_msg.encode('ascii', 'replace')
-        super(Erro, self).__init__(exc_msg)
-
-    @classmethod
-    def classe_por_codigo(cls, codigo):
-        for subcls in cls.__subclasses__():
-            if getattr(subcls, '__codig__', None) == codigo:
-                return subcls
-
-
-class ErroSistemaIndisponivel(Erro):
-    """
-    Sistema indisponível. Falha no sistema. Persistindo, entrar
-    em contato com o Suporte e-commerce.
-    """
-    __codigo__ = 97
-
-
-class ErroTimeout(Erro):
-    """
-    A aplicação não respondeu dentro de 25 segundos. Persistindo,
-    entrar em contato com o Suporte e-commerce.
-    """
-    __codigo__ = 98

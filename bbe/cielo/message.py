@@ -1,3 +1,4 @@
+import re
 import colander
 import contextlib
 from xml.etree.ElementTree import ElementTree, Element, fromstring
@@ -39,6 +40,7 @@ def _serialize_mapping(schema, cstruct):
         subtag = gettag(child)
         subvalue = cstruct.get(child.name, colander.null)
 
+        # TODO: default, required, etc
         if subvalue is colander.null:
             continue
 
@@ -87,4 +89,16 @@ def dumps(etree):
 
 
 def loads(string):
-    return fromstring(string)
+    etree = fromstring(string)
+    remove_namespaces(etree)
+    return etree
+
+
+def remove_namespaces(element):
+    """Remove all namespaces in the passed element in place."""
+    for ele in element.getiterator():
+        ele.tag = re.sub(r'^\{[^\}]+\}', '', ele.tag)
+
+
+def get_root_tag(etree):
+    return etree.tag

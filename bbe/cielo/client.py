@@ -1,118 +1,152 @@
 # -*- coding: utf-8 -*-
+import datetime as mod_datetime
+import uuid
 import urllib2
 import contextlib
-from bbe.cielo import (
-    RequisicaoConsulta,
-    RequisicaoConsultaPedido,
-    RequisicaoCaptura,
+from bbe.cielo import message
+from bbe.cielo.schema import (
+    TransactionRequestSchema,
+    INFORMADO,
+    INEXISTENTE,
+    DEBITO,
+    CREDITO_A_VISTA,
+    PARCELADO_ADMINISTRADORA,
+    guess_response_schema,
 )
+from bbe.cielo.error import Error, UnknownResponse, CommunicationError
+
+DEFAULT_CURRENCY = '096'
+
+
+class Order(object):
+    def __init__(self, value, number=None, datetime=None,
+                 description=None, currency=DEFAULT_CURRENCY, language='PT'):
+        self.value = value
+        self.number = number
+        self.datetime = datetime or mod_datetime.datetime.now()
+        self.currency = currency
+        self.description = description
+        self.language = language
+
+        if self.number is None:
+            self.number = self.unique_number()
+
+    def unique_number(self):
+        return '1'
+        #return str(uuid.uuid4())
+
+
+class Payment(object):
+    def __init__(self, value, datetime, installments, card_brand, card_number,
+                 card_holder_name, card_expiration_date, card_security_code):
+        self.value = value
+        self.datetime = datetime
+        self.installments = installments
+        self.card_brand = card_brand
+        self.card_number = card_number
+        self.card_holder_name = card_holder_name
+        self.card_expiration_date = card_expiration_date
+        self.card_security_code = card_security_code
+
+
+class DebitPayment(Payment):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('installments', 1)
+        super(Payment, self).__init__(*args, **kwargs)
+
 
 class Client(object):
-    """
-    The client.
-    """
+    def __init__(self, store_id, store_key, service_url=None):
+        self.store_id = store_id
+        self.store_key = store_key
+        self.service_url = service_url
 
-    def __init__(self, url):
-        self.url = url
+    def generate_transaction_id(self):
+        return str(uuid.uuid4())
 
-    def new_transaction(self, *args, **kwargs):
-        raise NotImplementedError()
+    def create_transaction(self, order, payment,  authorize, capture, return_url=None):
+        if payment.card_security_code is None:
+            code_indic = INEXISTENTE
+        else:
+            code_indic = INFORMADO
+            # TODO: support other security_code indices
 
-    def consultar_tid(self, ec, tid):
-        """
-        Efetua uma consulta via TID.
+        if isinstance(payment, DebitPayment):
+            product = DEBITO
+        elif payment.installments == 1:
+            product = CREDITO_A_VISTA
+        else:
+            product = PARCELADO_ADMINISTRADORA
+            # TODO suportar parcelado_administradora
 
-        .. note::
+        appstruct = {
+            'id': self.generate_transaction_id(),
+            'version': '1.1.1',
+            'establishment': {
+                'number': self.store_id,
+                'key': self.store_key,
+            },
+            'order': {
+                'number': order.number,
+                'value': order.value,
+                'currency': order.currency,
+                'datetime': order.datetime,
+                'description': order.description,
+                'language': order.language,
+            },
+            'holder': {
+                'number': payment.card_number,
+                'security_code': payment.card_security_code,
+                'security_code_indicator': code_indic,
+                'expiration_date': payment.card_expiration_date,
+                'holder_name': payment.card_holder_name,
+            },
+            'payment': {
+                'card_brand': payment.card_brand,
+                'product': product,
+                'installments': payment.installments,
+            },
+            'return_url': return_url,
+            'authorize': authorize,
+            'capture': capture,
+            'bin': payment.card_number[:6],
+        }
 
-            Segundo o manual da Cielo, apenas as transações dos últimos
-            180 dias estão disponíveis para consulta.
+        schema = TransactionRequestSchema(tag='requisicao-transacao')
+        request = schema.serialize(appstruct)
+        request = message.dumps(request)
+        return self.post_request(request)
 
-        :param ec: o :class:`Estabelecimento`
-        :param tid: o tid a ser consultado
-
-        :returns: :class:`Transacao`
-        """
-        requisicao = RequisicaoConsulta(ec=ec, tid=tid)
-        return self.enviar_requisicao(requisicao)
-
-    def consultar_pedido(self, ec, numero_pedido):
-        """
-        Efetua uma consulta via número do pedido.
-
-        .. note::
-
-            Segundo o manual da Cielo, apenas as transações dos últimos
-            180 dias estão disponíveis para consulta.
-
-        .. note::
-
-            Segundo a especificação da Cielo, é responsabilidade do
-            usuário do serviço garantir a unicidade dos números dos
-            pedidos gerados. Caso o estabelecimento faça mais de um
-            pedido com o mesmo número, a transação mais recente será
-            retornada pelo serviço.
-
-        :param ec: o :class:`Estabelecimento`
-        :param numero_pedido: o número do pedido a ser consultado
-
-        :returns: :class:`Transacao`
-        """
-        requisicao = RequisicaoConsultaPedido(ec=ec, numero_pedido=numero_pedido)
-        return self.enviar_requisicao(requisicao)
-
-    def capturar(self, ec, tid, valor=None, anexo=None):
-        requisicao = RequisicaoCaptura(ec, tid, valor, anexo)
-        return self.enviar_requisicao(requisicao)
-
-    def enviar_requisicao(self, requisicao):
-        message = requisicao.serialize()
-        return self.enviar_mensagem(message)
-
-    def enviar_mensagem(self, mensagem):
-        """
-        Envia uma mensagem para o webservice, analisa a resposta e tenta
-        convertê-la em uma subclasse de :class:`ContentType`. Pode levantar
-        :exc:`ErroComunicacao` caso ocorra algum problema de comunicação
-        com o serviço, :exc:`ErroAnalise` caso não consiga interpretar a
-        resposta obtida como um XML válido, :exc:`RespostaDesconhecida`,
-        caso não consiga converter a resposta em um :class:`ContentType`
-        ou alguma subclasse de :exc:`Erro` caso receba um erro como resposta.
-        """
-        data = u"mensagem=" + mensagem
+    def post_request(self, request):
+        msg = u"mensagem=" + request
+        #TODO msg = msg.encode('iso-')
 
         try:
-            # enviar a requisição e ler a resposta do webservice.
-            with contextlib.closing(urllib2.urlopen(self.url, data)) as r:
-                body = r.read()
+            request = urllib2.urlopen(self.service_url, msg)
+            with contextlib.closing(request) as response:
+                response = response.read()
         except urllib2.URLError, e:
-            raise ErroComunicacao(e.reason)
+            raise CommunicationError(e.reason)
 
-        response = Message.fromstring(body)
+        return self.process_response(response.decode('iso-8859-1'))
 
-        if response.root_tag == 'erro':
-            # o webservice retornou um erro. vamos tentar identificar a
-            # classe do erro.
-            schema = Erro.__schema__
-            cstruct = response.deserialize(schema)
-            appstruct = schema.deserialize(cstruct)
-            error_class = Erro.classe_por_codigo(appstruct['codigo'])
+    def process_response(self, response):
+        response = message.loads(response.encode('utf-8'))
 
-            # se nenhuma classe puder ser identificada, vamos tratar o
-            # erro como um erro comum
-            if not error_class:
-                error_class = Erro
+        # get the root type
+        root_tag = message.get_root_tag(response)
 
-            erro = error_class.fromappstruct(appstruct)
-            raise erro
+        # let's try to guess the response content-type
+        schema = guess_response_schema(root_tag)
+
+        if schema is None:
+            raise UnknownResponse("Unknown response type '%s'" % root_tag)
+
+        # TODO specialized exception class?
+        cstruct = message.deserialize(schema, response)
+        response = schema.deserialize(cstruct)
+
+        if isinstance(response, Error):
+            raise response
         else:
-            # encontrar o ContentType correspondente à resposta
-            content_type = ContentType.find_by_tag_name(root_tag)
-            if content_type is None:
-                raise RespostaDesconhecida('Nao foi possivel econtrar '
-                                           'uma clase correspondente '
-                                           'a tag "%s"' % root_tag)
-            else:
-                schema = content_type.__schema__
-                cstruct = deetreeify(schema, etree)
-                appstruct = schema.deserialize(cstruct)
-                return content_type.fromappstruct(appstruct)
+            return response

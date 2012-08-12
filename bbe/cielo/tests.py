@@ -142,30 +142,92 @@ class MoneyTestCase(unittest.TestCase):
 
 class TestCase(unittest.TestCase):
     def setUp(self):
-        self.establishment = cielo.Establishment(
-            '1006993069',
-            '25fbb99741c739dd84d7b06ec78c9bac718838630f30b112d033ce2e621b34f3',
-        )
         self.client = cielo.Client(
-            url='https://qasecommerce.cielo.com.br/servicos/ecommwsec.do',
+            #store_id='1001734898',
+            #store_key='e84827130b9837473681c2787007da5914d6359947015a5cdb2b8843db0fa832',
+            store_id='1006993069',
+            store_key='25fbb99741c739dd84d7b06ec78c9bac718838630f30b112d033ce2e621b34f3',
+            service_url='https://qasecommerce.cielo.com.br/servicos/ecommwsec.do',
         )
 
 
 class MonolithicTestCase(TestCase):
-    def test_transaction(self):
-        order = cielo.Order(date=datetime.datetime.now(),
-                            value=Decimal('200.0'))
-        payment = cielo.CreditCardPayment(
-            card_number='4012001037141112',
+    def test_process_response(self):
+        response = self.client.process_response(u"""
+            <transacao versao="1.1.1" id="f71e286f-21f6-4abe-8999-cc200e585454" xmlns="http://ecommerce.cbmp.com.br">
+              <tid>100699306905227C1001</tid>
+              <pan>uv9yI5tkhX9jpuCt+dfrtoSVM4U3gIjvrcwMBfZcadE=</pan>
+              <dados-pedido>
+                <numero>1</numero>
+                <valor>20000</valor>
+                <moeda>96</moeda>
+                <data-hora>2012-08-11T08:48:23.659-03:00</data-hora>
+                <idioma>PT</idioma>
+              </dados-pedido>
+              <forma-pagamento>
+                <bandeira>visa</bandeira>
+                <produto>1</produto>
+                <parcelas>1</parcelas>
+              </forma-pagamento>
+              <status>5</status>
+              <autenticacao>
+                <codigo>5</codigo>
+                <mensagem>Transacao sem autenticacao</mensagem>
+                <data-hora>2012-08-11T08:48:23.695-03:00</data-hora>
+                <valor>20000</valor>
+                <eci>7</eci>
+              </autenticacao>
+              <autorizacao>
+                <codigo>5</codigo>
+                <mensagem>Autorização negada</mensagem>
+                <data-hora>2012-08-11T08:48:43.708-03:00</data-hora>
+                <valor>20000</valor>
+                <lr>999</lr>
+                <nsu>336508</nsu>
+              </autorizacao>
+            </transacao>""")
+        self.assertIsInstance(response, cielo.Transaction)
+
+
+    def skip_test_transaction(self):
+        order = cielo.Order(value=Decimal('200.0'))
+        payment = cielo.Payment(
+            card_number='4551870000000183',
             card_expiration_date=nextmonth(),
             card_security_code='123',
             card_holder_name='Joao da Silva',
             card_brand=cielo.VISA,
             value=order.value,
-            date=order.date,
-            plots=2,
+            datetime=order.datetime,
+            installments=1,
         )
-        self.client.new_transaction(
+        self.client.create_transaction(
             order=order,
             payment=payment,
+            authorize=3,
+            capture=True,
+            return_url='http://example.com',
         )
+
+"""
+As informações abaixo podem ser usadas pelo desenvolvedor durante o desenvolvimento da
+integração.
+Cartão com autenticação: 4012001037141112 (visa)
+Cartão sem autenticação: 4551870000000183 (visa), 5453010000066167 (mastercard),
+6362970000457013 (elo), 36490102462661 (diners) e 6011020000245045 (discover).
+Data de validade: qualquer posterior ao corrente
+Código de segurança: qualquer
+Valor do pedido: para simular transação autorizada, use qualquer valor em que os dois
+últimos dígitos sejam zeros. Do contrário, toda autorização será negada.
+Credenciais
+Leitura
+Número
+ Chave
+do
+cartão
+Loja
+ 1006993069 25fbb99741c739dd84d7b06ec78c9bac718838630f30b112d033ce2e621b34f3
+Cielo
+ 1001734898 e84827130b9837473681c2787007da5914d6359947015a5cdb2b8843db0fa832
+
+"""

@@ -22,14 +22,14 @@ CARD_BRANDS = (MASTERCARD, DINERS, DISCOVER, ELO, VISA)
 
 CREDITO_A_VISTA = '1'
 PARCELADO_LOJA = '2'
-PARCELADO_ADMINISTRADORA = '2'
-A_VISTA = 'A'
+PARCELADO_ADMINISTRADORA = '3'
+DEBITO = 'A'
 
-PRODUTOS = (
+PRODUCTS = (
     CREDITO_A_VISTA,
     PARCELADO_LOJA,
     PARCELADO_ADMINISTRADORA,
-    A_VISTA
+    DEBITO,
 )
 
 NAO_INFORMADO = 'nao-informado'
@@ -75,7 +75,7 @@ class SecurityCodeIndicator(colander.Integer):
         i = self.map.get(appstruct, None)
         if i is None:
             raise colander.Invalid(node, "%s is not a valid SecuirtyCodeIndicator" % appstruct)
-        return super(SecurityCodeIndicator, self).serialize(i)
+        return super(SecurityCodeIndicator, self).serialize(node, i)
 
     def deserialize(self, node, cstruct):
         i = super(SecurityCodeIndicator, self).deserialize(node, cstruct)
@@ -217,7 +217,7 @@ class ErroSchema(colander.Schema):
     mensagem = colander.SchemaNode(colander.String())
 
 
-class PortadorSchema(colander.Schema):
+class CardHolderSchema(colander.Schema):
     """
     dados-portador
 
@@ -229,20 +229,22 @@ class PortadorSchema(colander.Schema):
     dados-portador.codigo-seguranca N   C   3..4    Obrigatório se indicador = 1.
     dados-portador.nome-portador    AN  O   0..50   Opcional. Nome impresso no cartão.
     """
-    numero = colander.SchemaNode(colander.String(),
+    number = colander.SchemaNode(colander.String(),
+                                 tag='numero',
                                  validator=colander.Length(16, 16))
-    validade = colander.SchemaNode(Month())
-    indicador = colander.SchemaNode(SecurityCodeIndicator())
-    codigo_seguranca = colander.SchemaNode(colander.String(),
-                                           tag='codigo-seguranca',
-                                           validator=colander.Length(3, 4))
-    nome = colander.SchemaNode(colander.String(),
-                               tag='nome-portador',
-                               missing=colander.null,
-                               validator=colander.Length(max=50))
+    expiration_date = colander.SchemaNode(Month(), tag='validade')
+    security_code_indicator = colander.SchemaNode(SecurityCodeIndicator(),
+                                                  tag='indicador')
+    security_code = colander.SchemaNode(colander.String(),
+                                        tag='codigo-seguranca',
+                                        validator=colander.Length(3, 4))
+    holder_name = colander.SchemaNode(colander.String(),
+                                      tag='nome-portador',
+                                      missing=colander.null,
+                                      validator=colander.Length(max=50))
 
 
-class PedidoSchema(colander.Schema):
+class OrderSchema(colander.Schema):
     """
     dados-pedido
 
@@ -256,25 +258,29 @@ class PedidoSchema(colander.Schema):
                                             Com base nessa informação é definida a língua a ser utilizada
                                             nas telas da Cielo. Caso não preenchido, assume-se PT.
     """
-    numero = colander.SchemaNode(colander.String(),
+    number = colander.SchemaNode(colander.String(),
+                                 tag='numero',
                                  validator=colander.Length(max=20))
-    valor = colander.SchemaNode(Money(),
+    value = colander.SchemaNode(Money(),
+                                tag='valor',
                                 validator=colander.Range(
                                     min=Decimal('0.01'),
                                     max=Decimal('9999999999.99')
                                 ))
-    moeda = colander.SchemaNode(colander.String()) # TODO OneOf
-    data = colander.SchemaNode(DateTime(), tag='data-hora')
-    descricao = colander.SchemaNode(colander.String(),
-                                    validator=colander.Length(max=1024),
-                                    missing=colander.null)
-    idioma = colander.SchemaNode(colander.String(),
-                                 missing='PT',
-                                 defaults='PT',
-                                 validator=colander.OneOf(LANGUAGES))
+    currency = colander.SchemaNode(colander.String(), tag='moeda') # TODO OneOf
+    datetime = colander.SchemaNode(DateTime(), tag='data-hora')
+    description = colander.SchemaNode(colander.String(),
+                                      tag='descricao',
+                                      validator=colander.Length(max=1024),
+                                      missing=colander.null)
+    language = colander.SchemaNode(colander.String(),
+                                   tag='idioma',
+                                   missing='PT',
+                                   defaults='PT',
+                                   validator=colander.OneOf(LANGUAGES))
 
 
-class FormaPagamentoSchema(colander.Schema):
+class PaymentSchema(colander.Schema):
     """
     forma-pagamento
 
@@ -286,25 +292,30 @@ class FormaPagamentoSchema(colander.Schema):
     forma-pagamento.parcelas    N   R   1..3    Número de parcelas. Para crédito à vista ou
                                                 débito, utilizar 1.
     """
-    bandeira = colander.SchemaNode(colander.String(),
-                                   validator=colander.OneOf(CARD_BRANDS))
-    produto = colander.SchemaNode(colander.String(),
-                                  validator=colander.OneOf(PRODUTOS))
-    parcelas = colander.SchemaNode(colander.Integer(),
-                                   validator=colander.Range(1, 999))
+    card_brand = colander.SchemaNode(colander.String(),
+                                     tag='bandeira',
+                                     validator=colander.OneOf(CARD_BRANDS))
+    product = colander.SchemaNode(colander.String(),
+                                  tag='produto',
+                                  validator=colander.OneOf(PRODUCTS))
+    installments = colander.SchemaNode(colander.Integer(),
+                                       tag='parcelas',
+                                       validator=colander.Range(1, 999))
 
 
-class EstabelecimentoSchema(colander.Schema):
+class EstablishmentSchema(colander.Schema):
     """
     dados-ec
 
     dados-ec.numero N   R   1..20   Número de afiliação da loja com a Cielo.
     dados-ec.chave  AN  R   1..100  Chave de acesso da loja atribuída pela Cielo.
     """
-    numero = colander.SchemaNode(colander.String(),
+    number = colander.SchemaNode(colander.String(),
+                                 tag='numero',
                                  validator=colander.Length(max=20))
-    chave = colander.SchemaNode(colander.String(),
-                                validator=colander.Length(max=100))
+    key = colander.SchemaNode(colander.String(),
+                              tag='chave',
+                              validator=colander.Length(max=100))
 
 
 class AutenticacaoSchema(colander.Schema):
@@ -344,17 +355,17 @@ class Raiz(colander.Schema):
     Schema base para schemas de nós-raiz.
     """
     id = colander.SchemaNode(colander.String(), attrib=True)
-    versao = colander.SchemaNode(colander.String(), attrib=True)
+    version = colander.SchemaNode(colander.String(), tag='versao', attrib=True)
 
 
-class RequisicaoTransacaoSchema(Raiz):
-    ec = EstabelecimentoSchema(tag='dados-ec')
-    portador = PortadorSchema(tag='dados-portador', missing=colander.null)
-    pedido = PedidoSchema(tag='dados-pedido')
-    pagamento = FormaPagamentoSchema(tag='forma-pagamento')
-    url_retorno = colander.SchemaNode(colander.String(), tag='url-retorno')
-    autorizar = colander.SchemaNode(colander.Integer())
-    capturar = colander.SchemaNode(colander.Boolean(), tag='capturar', missing=colander.null)
+class TransactionRequestSchema(Raiz):
+    establishment = EstablishmentSchema(tag='dados-ec')
+    holder = CardHolderSchema(tag='dados-portador', missing=colander.null)
+    order = OrderSchema(tag='dados-pedido')
+    payment = PaymentSchema(tag='forma-pagamento')
+    return_url = colander.SchemaNode(colander.String(), tag='url-retorno')
+    authorize = colander.SchemaNode(colander.Integer(), tag='autorizar')
+    capture = colander.SchemaNode(colander.Boolean(), tag='capturar', missing=colander.null)
     bin = colander.SchemaNode(colander.String(), tag='bin', missing=colander.null)
 
 
@@ -369,10 +380,10 @@ class RequisicaoConsultaSchema(Raiz):
     tid             AN  R   1..40   Identificador da transação.
     """
     tid = colander.SchemaNode(colander.String(), validator=colander.Length(max=40))
-    ec = EstabelecimentoSchema(tag='dados-ec')
+    ec = EstablishmentSchema(tag='dados-ec')
 
 
-class RequisicaoConsultaPedidoSchema(Raiz):
+class RequisicaoConsultaOrderSchema(Raiz):
     """
     Schema da Consulta via Número do Pedido
 
@@ -385,7 +396,7 @@ class RequisicaoConsultaPedidoSchema(Raiz):
     numero_pedido = colander.SchemaNode(colander.String(),
                                         tag='numero-pedido',
                                         validator=colander.Length(max=20))
-    ec = EstabelecimentoSchema(tag='dados-ec')
+    ec = EstablishmentSchema(tag='dados-ec')
 
 
 class RequisicaoCapturaSchema(Raiz):
@@ -408,13 +419,13 @@ class RequisicaoCapturaSchema(Raiz):
     anexo = colander.SchemaNode(colander.String(),
                                 missing=colander.null,
                                 validator=colander.Length(max=1024))
-    ec = EstabelecimentoSchema(tag='dados-ec')
+    ec = EstablishmentSchema(tag='dados-ec')
 
 
 class TransacaoSchema(Raiz):
     tid = colander.SchemaNode(colander.String())
-    pedido = PedidoSchema(tag='dados-pedido')
-    pagamento = FormaPagamentoSchema(tag='forma-pagamento')
+    pedido = OrderSchema(tag='dados-pedido')
+    pagamento = PaymentSchema(tag='forma-pagamento')
     status = colander.SchemaNode(colander.Integer(), validator=colander.OneOf(STATUS))
     autenticacao = AutenticacaoSchema(missing=colander.null)
     autorizacao = AutorizacaoSchema(missing=colander.null)
@@ -424,3 +435,7 @@ class TransacaoSchema(Raiz):
     url_autenticacao = colander.SchemaNode(colander.String(),
                                            tag='url-autenticacao',
                                            missing=colander.null)
+
+
+def guess_response_schema(tag):
+    pass
