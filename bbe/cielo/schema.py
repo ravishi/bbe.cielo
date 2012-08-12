@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import inspect
 import datetime
 import colander
 from decimal import Decimal
@@ -212,11 +213,6 @@ class Month(BaseDateTime):
     extended_format = None
 
 
-class ErroSchema(colander.Schema):
-    codigo = colander.SchemaNode(colander.Integer())
-    mensagem = colander.SchemaNode(colander.String())
-
-
 class CardHolderSchema(colander.Schema):
     """
     dados-portador
@@ -422,7 +418,14 @@ class RequisicaoCapturaSchema(Raiz):
     ec = EstablishmentSchema(tag='dados-ec')
 
 
-class TransacaoSchema(Raiz):
+class ErrorSchema(colander.Schema):
+    tag = 'error'
+    code = colander.SchemaNode(colander.Integer(), tag='codigo')
+    message = colander.SchemaNode(colander.String(), tag='mensagem')
+
+
+class TransactionSchema(Raiz):
+    tag = 'transacao'
     tid = colander.SchemaNode(colander.String())
     pedido = OrderSchema(tag='dados-pedido')
     pagamento = PaymentSchema(tag='forma-pagamento')
@@ -438,4 +441,12 @@ class TransacaoSchema(Raiz):
 
 
 def guess_response_schema(tag):
-    pass
+    from bbe.cielo import schema
+    members = inspect.getmembers(schema)
+    for (name, value) in members:
+        if not isinstance(value, type):
+            continue
+        if not issubclass(value, colander.Schema):
+            continue
+        if getattr(value, 'tag', None) == tag:
+            return value(tag=value.tag)
