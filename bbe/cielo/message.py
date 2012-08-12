@@ -93,9 +93,13 @@ def _deserialize_mapping(schema, element):
 def dumps(tree):
     #if isinstance(tree, etree.Element):
     #    tree = etree.ElementTree(tree)
-    with contextlib.closing(StringIO()) as s:
-        tree.write(s)
-        return s.getvalue().replace(' />', '/>')
+    with contextlib.closing(StringIO()) as sio:
+        tree.write(sio)
+        s =  sio.getvalue()
+        # XXX xml.etree.ElementTree does like ' />', while lxml.etree
+        # does like '/>'. we don't know which one we'll use, so...
+        s.replace(' />', '/>')
+        return s
 
 
 def loads(data):
