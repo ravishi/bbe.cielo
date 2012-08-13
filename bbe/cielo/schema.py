@@ -102,6 +102,10 @@ class DebitPayment(Payment):
         super(Payment, self).__init__(*args, **kwargs)
 
 
+class ContentType(object):
+    pass
+
+
 class Response(object):
     @property
     def success(self):
@@ -387,47 +391,108 @@ class EstablishmentSchema(colander.Schema):
                               validator=colander.Length(max=100))
 
 
-class AutenticacaoSchema(colander.Schema):
-    codigo = colander.SchemaNode(colander.Integer())
-    mensagem = colander.SchemaNode(colander.String())
-    data = colander.SchemaNode(DateTime(), tag='data-hora')
-    valor = colander.SchemaNode(Money())
+class AuthenticationSchema(colander.Schema):
+    """Nó com dados da autenticação caso tenha passado por essa etapa.
+
+    codigo      N   1..2    Código do processamento.
+    mensagem    AN  1..100  Detalhe do processamento.
+    data-hora   AN  19      Data hora do processamento.
+    valor       N   1..12   Valor do processamento sem pontuação. Os dois
+                            últimos dígitos são os centavos.
+    eci         N   2       Nível de segurança.
+    """
+    tag = 'autenticacao'
+    content_type = Authentication
+
+    code = colander.SchemaNode(colander.Integer(), tag='codigo')
+    message = colander.SchemaNode(colander.String(), tag='mensagem')
+    datetime = colander.SchemaNode(DateTime(), tag='data-hora')
+    value = colander.SchemaNode(Money(), tag='valor')
     eci = colander.SchemaNode(colander.Integer())
 
 
-class AutorizacaoSchema(colander.Schema):
-    codigo = colander.SchemaNode(colander.Integer())
-    mensagem = colander.SchemaNode(colander.String())
-    data = colander.SchemaNode(DateTime(), tag='data-hora')
-    valor = colander.SchemaNode(Money())
-    lr = colander.SchemaNode(colander.Integer()) # TODO OneOf?
-    nsu = colander.SchemaNode(colander.String()) # TODO wtf?
-    arp = colander.SchemaNode(colander.String(), missing=colander.null) # só está disponível em transações que foram auatorizadas
+class AuthorizationSchema(colander.Schema):
+    """Nó com dados da autorização caso tenha passado por essa etapa.
 
-
-class CapturaSchema(colander.Schema):
-    codigo = colander.SchemaNode(colander.Integer())
-    mensagem = colander.SchemaNode(colander.String())
-    data = colander.SchemaNode(DateTime(), tag='data-hora')
-    valor = colander.SchemaNode(Money())
-
-
-class CancelamentoSchema(colander.Schema):
-    codigo = colander.SchemaNode(colander.Integer())
-    mensagem = colander.SchemaNode(colander.String())
-    data = colander.SchemaNode(DateTime(), tag='data-hora')
-    valor = colander.SchemaNode(Money())
-
-
-class Raiz(colander.Schema):
+    codigo      N   1..2    Código do processamento.
+    mensagem    AN  1..100  Detalhe do processamento.
+    data-hora   AN  19      Data hora do processamento
+    valor       N   1..12   Valor do processamento sem pontuação. Os
+                            dois últimos dígitos são os centavos.
+    lr          N   2       Retorno da autorização. Quando negada, é o
+                            motivo da negação.
+    arp         AN  6       Código da autorização caso a transação
+                            tenha sido autorizada com sucesso.
+    nsu         AN  6       Número de sequência da autorização. Obviamente,
+                            só está disponível em transações autorizadas.
     """
-    Schema base para schemas de nós-raiz.
+    tag = 'autorizacao'
+    content_type = Authorization
+
+    code = colander.SchemaNode(colander.Integer(),
+                               tag='code',
+                               validator=colander.Length(max=2))
+    mensagem = colander.SchemaNode(colander.String(),
+                                   tag='mensagem',
+                                   validator=colander.Length(max=1000))
+    data = colander.SchemaNode(DateTime(), tag='data-hora')
+    valor = colander.SchemaNode(Money(),
+                                tag='valor',
+                                validator=colander.Range(max=Decimal('9'*10 + '.99')))
+    lr = colander.SchemaNode(colander.Integer(),
+                             validator=colander.Length(max=2))
+    nsu = colander.SchemaNode(colander.String(),
+                              validator=colander.Length(max=6))
+    arp = colander.SchemaNode(colander.String(),
+                              missing=colander.null,
+                              validator=colander.Length(max=6))
+
+
+class CaptureSchema(colander.Schema):
+    """Nó com dados da captura caso tenha passado por essa etapa.
+
+    codigo      N   1..2    Código do processamento.
+    mensagem    AN  1..100  Detalhe do processamento.
+    data-hora   AN  19      Data hora do processamento.
+    valor       N   1..12   Valor do processamento sem pontuação. Os
+                            dois últimos dígitos são os centavos.
+    """
+    tag = 'captura'
+    content_type = Capture
+
+    code = colander.SchemaNode(colander.Integer(), tag='codigo')
+    message = colander.SchemaNode(colander.String(), tag='mensagem')
+    date = colander.SchemaNode(DateTime(), tag='data-hora')
+    value = colander.SchemaNode(Money(), tag='valor')
+
+
+class CancelSchema(colander.Schema):
+    """Nó com dados do cancelamento caso tenha passado por essa etapa.
+
+    codigo      N   1..2    Código do processamento.
+    mensagem    AN  1..100  Detalhe do processamento.
+    data-hora   AN  19      Data hora do processamento.
+    valor       N   1..12   Valor do processamento sem pontuação. Os
+                            dois últimos dígitos são os centavos.
+    """
+    tag = 'cancel'
+
+    code = colander.SchemaNode(colander.Integer(), tag='codigo')
+    message = colander.SchemaNode(colander.String(), tag='mensagem')
+    date = colander.SchemaNode(DateTime(), tag='data-hora')
+    value = colander.SchemaNode(Money(), tag='valor')
+
+
+class RootNode(colander.Schema):
+    """Base schema for all root nodes.
     """
     id = colander.SchemaNode(colander.String(), attrib=True)
     version = colander.SchemaNode(colander.String(), tag='versao', attrib=True)
 
 
-class TransactionRequestSchema(Raiz):
+class TransactionRequestSchema(RootNode):
+    tag = 'transacao'
+
     establishment = EstablishmentSchema(tag='dados-ec')
     holder = CardHolderSchema(tag='dados-portador', missing=colander.null)
     order = OrderSchema(tag='dados-pedido')
@@ -438,57 +503,56 @@ class TransactionRequestSchema(Raiz):
     bin = colander.SchemaNode(colander.String(), tag='bin', missing=colander.null)
 
 
-class RequisicaoConsultaSchema(Raiz):
-    """
-    Schema da Consulta via TID
+class QuerySchema(RootNode):
+    """Funcionalidade de extrema importância na integração.
+    É através dela que a loja virtual obtém uma “foto” da
+    transação. É sempre utilizada após a loja ter recebido o
+    retorno do fluxo da Cielo
 
-    requisicao-consulta
-
-    dados-ec.numero N   R   1..20   Número de afiliação da loja com a Cielo
-    dados-ec.chave  AN  R   1..100  Chave de acesso da loja atribuída pela Cielo
     tid             AN  R   1..40   Identificador da transação.
     """
-    tid = colander.SchemaNode(colander.String(), validator=colander.Length(max=40))
-    ec = EstablishmentSchema(tag='dados-ec')
+    tag = 'requisicao-consulta'
 
-
-class RequisicaoConsultaOrderSchema(Raiz):
-    """
-    Schema da Consulta via Número do Pedido
-
-    requisicao-consulta-chsec
-
-    numero-pedido   NA  R   1...20  Número do Pedido associado à Transação
-    dados-ec.numero N   R   1..20   Número de afiliação da loja com a Cielo
-    dados-ec.chave  AN  R   1..100  Chave de acesso da loja atribuída pela Cielo
-    """
-    numero_pedido = colander.SchemaNode(colander.String(),
-                                        tag='numero-pedido',
-                                        validator=colander.Length(max=20))
-    ec = EstablishmentSchema(tag='dados-ec')
-
-
-class RequisicaoCapturaSchema(Raiz):
-    """
-    Schema da requisição de captura.
-
-    requisicao-captura
-
-    dados-ec.numero N   R   1..20   Número de afiliação da loja com a Cielo
-    dados-ec.chave  AN  R   1..100  Chave de acesso da loja atribuída pela Cielo
-    tid             AN  R   1..40   Identificador da transação.
-    valor           N   O   1..12   Valor da captura. Caso não fornecido, o valor atribuído é o valor da autorização.
-    anexo           AN  O   1..1024 Informação adicional para detalhamento da captura.
-    """
     tid = colander.SchemaNode(colander.String(),
                               validator=colander.Length(max=40))
-    valor = colander.SchemaNode(Money(),
+    establishment = EstablishmentSchema(tag='dados-ec')
+
+
+class OrderQuerySchema(RootNode):
+    """
+    numero-pedido   NA  R   1...20  Número do Pedido associado à Transação
+    """
+    tag = 'requisicao-consulta-chsec'
+
+    order_number = colander.SchemaNode(colander.String(),
+                                       tag='numero-pedido',
+                                       validator=colander.Length(max=20))
+    establishment = EstablishmentSchema(tag='dados-ec')
+
+
+class CaptureRequestNode(RootNode):
+    """Schema da requisição de captura.
+
+    dados-ec.numero N   R   1..20   Número de afiliação da loja com a Cielo
+    dados-ec.chave  AN  R   1..100  Chave de acesso da loja atribuída pela Cielo
+    tid             AN  R   1..40   Identificador da transação.
+    valor           N   O   1..12   Valor da captura. Caso não fornecido,
+                                    o valor atribuído é o valor da autorização.
+    anexo           AN  O   1..1024 Informação adicional para detalhamento da captura.
+    """
+    tag = 'requisicao-captura'
+
+    tid = colander.SchemaNode(colander.String(),
+                              validator=colander.Length(max=40))
+    value = colander.SchemaNode(Money(),
+                                tag='valor',
                                 missing=colander.null,
                                 validator=colander.Range(max=Decimal('9999999999.99')))
-    anexo = colander.SchemaNode(colander.String(),
-                                missing=colander.null,
-                                validator=colander.Length(max=1024))
-    ec = EstablishmentSchema(tag='dados-ec')
+    attachment = colander.SchemaNode(colander.String(),
+                                     tag='anexo',
+                                     missing=colander.null,
+                                     validator=colander.Length(max=1024))
+    establishment = EstablishmentSchema(tag='dados-ec')
 
 
 class ErrorSchema(colander.Schema):
@@ -499,7 +563,7 @@ class ErrorSchema(colander.Schema):
     message = colander.SchemaNode(colander.String(), tag='mensagem')
 
 
-class TransactionSchema(Raiz):
+class TransactionSchema(RootNode):
     tag = 'transacao'
     content_type = Transaction
 
@@ -507,10 +571,10 @@ class TransactionSchema(Raiz):
     order = OrderSchema(tag='dados-pedido')
     payment = PaymentSchema(tag='forma-pagamento')
     status = colander.SchemaNode(colander.Integer(), validator=colander.OneOf(STATUS))
-    authentication = AutenticacaoSchema(tag='autenticacao', missing=colander.null)
-    authorization = AutorizacaoSchema(tag='autorizacao', missing=colander.null)
-    capture = CapturaSchema(tag='captura', missing=colander.null)
-    cancel = CancelamentoSchema(tag='cancelamento', missing=colander.null)
+    authentication = AuthenticationSchema(tag='autenticacao', missing=colander.null)
+    authorization = AuthorizationSchema(tag='autorizacao', missing=colander.null)
+    capture = CaptureSchema(tag='captura', missing=colander.null)
+    cancel = CancelSchema(tag='cancelamento', missing=colander.null)
     pan = colander.SchemaNode(colander.String())
     authentication_url = colander.SchemaNode(colander.String(),
                                              tag='url-autenticacao',

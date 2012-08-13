@@ -202,6 +202,7 @@ class MonolithicTestCase(TestCase):
                     <mensagem>Valor de captura inválido</mensagem>
                 </erro>""".encode('iso-8859-1'))
         self.assertFalse(response.success)
+        self.assertIsInstance(response, cielo.Error)
         self.assertEqual(response.code, 32)
         self.assertEqual(response.message, u"Valor de captura inválido")
 
