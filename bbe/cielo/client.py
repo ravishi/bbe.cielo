@@ -1,14 +1,10 @@
 # -*- coding: utf-8 -*-
+import datetime
 import uuid
 import urllib2
 import contextlib
 from bbe.cielo import message
-from bbe.cielo.schema import (
-    SERVICE_VERSION,
-    Error,
-    Transaction,
-    TransactionRequestSchema,
-)
+from bbe.cielo import schema as schemas
 
 
 class CommunicationError(urllib2.URLError):
@@ -28,40 +24,131 @@ class UnknownResponse(Exception):
     """
 
 
+class Error(object):
+    def __init__(self, message, code):
+        self.message = message
+        self.code = code
+
+
+class Transaction(object):
+    def __init__(self, tid, order, store, value, currency, language, brand,
+                 installments, product, status, pan, description=None,
+                 authentication=None, authorization=None, capture=None,
+                 cancel=None, authentication_url=None):
+        self.tid = tid
+        self.order = order
+        self.store = store
+        self.value = value
+        self.currency = currency
+        self.language = language
+        self.brand = brand
+        self.installments = installments
+        self.product = product
+        self.status = status
+        self.pan = pan
+        self.authorization = authorization
+        self.authentication = authentication
+        self.calcel = cancel
+        self.capture = capture
+        self.authentication_url = authentication_url
+
+    @property
+    def authorized(self):
+        pass
+
+    @property
+    def authenticated(self):
+        pass
+
+    @property
+    def cancelled(self):
+        return self.status == schemas.ST_CANCELADA
+
+
+class Card(object):
+    def __init__(self, number, holder_name, expiration_date, security_code=None):
+        self.number = number
+        self.holder_name = holder_name
+        self.expiration_date = expiration_date
+        self.security_code = security_code
+
+
 class Client(object):
-    def __init__(self, store_id, store_key, service_url=None):
+    def __init__(self, store_id, store_key, service_url,
+                 default_currency=schemas.DEFAULT_CURRENCY,
+                 default_language=schemas.DEFAULT_LANGUAGE):
         self.store_id = store_id
         self.store_key = store_key
         self.service_url = service_url
+        self.default_currency = default_currency
+        self.default_language = default_language
 
-    def generate_transaction_id(self):
+    def generate_request_id(self):
         return str(uuid.uuid4())
 
-    def create_transaction(self, order, payment, authorize, capture, card=None, return_url=None):
+    def create_payment(self, value, card, installments, authorize, capture,
+                       created_at=None, description=None, currency=None,
+                       language=None):
+        currency = currency or self.default_currency
+        language = language or self.default_language
+
+        # TODO is this really necessary?
+        return_url = 'http://example.com'
+
+        created_at = created_at or datetime.datetime.now()
+
+        if not isinstance(card, Card):
+            brand = card
+        else:
+            if card.security_code is None:
+                card_indicator = schemas.INDISPONIVEL
+            else:
+                card_indicator = schemas.DISPONIVEL
+
+        # the order id
+        oid = self.generate_order_number()
+
         appstruct = {
-            'id': self.generate_transaction_id(),
-            'version': SERVICE_VERSION,
+            'id': self.generate_request_id(),
+            'version': schemas.SERVICE_VERSION,
             'establishment': {
                 'number': self.store_id,
                 'key': self.store_key,
             },
-            'order': order.serialize(),
-            'payment': payment.serialize(),
+            'order': {
+                'number': oid,
+                'value': value,
+                'currency': currency,
+                'description': description,
+                'datetime': created_at,
+                'language': language,
+            },
+            'payment': {
+                'brand': brand,
+                'product': product,
+                'installments': installments,
+            },
             'return_url': return_url,
             'authorize': authorize,
             'capture': capture,
         }
 
-        if card is not None:
-            appstruct['holder'] = card.serialize()
+        if isinstance(card, Card):
+            appstruct['holder'] = {
+                'number': card.number,
+                'indicator': card_indicator,
+                'holder_name': card.holder_name,
+                'expiration_date': card.expiration_date,
+                'security_code': card.security_code,
+            }
             appstruct['bin'] =  card.number[:6]
 
-        schema = TransactionRequestSchema(tag='requisicao-transacao')
-
+        # TODO move this 'tag' thing to the schema, where it belongs
+        schema = schemas.TransactionRequestSchema(tag='requisicao-transacao')
         cstruct = schema.serialize(appstruct)
-        request = message.serialize(schema, cstruct)
-        request = message.dumps(request)
-        return self.post_request(request)
+        etree = message.serialize(schema, cstruct)
+        request = message.dumps(etree)
+        return  self.post_request(request)
 
     def post_request(self, request):
         msg = u"mensagem=" + request
@@ -76,19 +163,41 @@ class Client(object):
         return self.process_response(response)
 
     def process_response(self, response):
-        response = message.loads(response)
-        root_tag = message.get_root_tag(response)
+        etree = message.loads(response)
+        root_tag = message.get_root_tag(etree)
 
         if root_tag == 'erro':
-            response_cls = Error
+            schema = schemas.ErrorSchema()
         elif root_tag == 'transacao':
-            response_cls = Transaction
+            schema = schemas.TransactionSchema()
         else:
-            # TODO shouldn't this be named UnexpectedResponse
-            raise UnknownResponse("Unknown response type '%s'" % root_tag)
+            raise UnknownResponse("Unexpected response '%s'" % root_tag)
 
-        schema = response_cls.__schema__
-        cstruct = message.deserialize(schema, response)
+        cstruct = message.deserialize(schema, etree)
         appstruct = schema.deserialize(cstruct)
 
-        return response_cls.from_appstruct(appstruct)
+        if root_tag == 'erro':
+            return Error(appstruct['message'], code=appstruct['code'])
+
+        order = appstruct['order']
+        payment = appstruct['payment']
+        status = appstruct['status']
+        return Transaction(
+            tid=appstruct['tid'],
+            store=self.store_id,
+            order=order['number'],
+            value=order['value'],
+            currency=order['currency'],
+            language=order['language'],
+            description=order['description'],
+            brand=payment['brand'],
+            installments=payment['installments'],
+            product=payment['product'],
+            status=status,
+            pan=appstruct['pan'],
+            authentication=appstruct.get('authentication'),
+            authentication_url=appstruct['authentication_url'],
+            authorization=appstruct.get('authorization'),
+            capture=appstruct.get('capture'),
+            cancel=appstruct.get('cancel'),
+        )

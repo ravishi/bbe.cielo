@@ -141,31 +141,18 @@ class MoneyTestCase(unittest.TestCase):
         self.assertRaises(colander.Invalid, self.node.serialize, Decimal('200.543'))
 
 
-class ContentTypeTest(unittest.TestCase):
-    def test_order(self):
-        order = cielo.Order(number='12345',
-                            value=Decimal('100'),
-                            datetime=datetime.datetime.now(),
-                            description='Description',
-                            currency=cielo.DEFAULT_CURRENCY,
-                            language=cielo.DEFAULT_LANGUAGE)
-        appstruct = order.serialize()
-        self.assertEqual(appstruct, order._validate(appstruct))
-
 # do not trust these
 
 class TestCase(unittest.TestCase):
     def setUp(self):
         self.client = cielo.Client(
-            #store_id='1001734898',
-            #store_key='e84827130b9837473681c2787007da5914d6359947015a5cdb2b8843db0fa832',
             store_id='1006993069',
             store_key='25fbb99741c739dd84d7b06ec78c9bac718838630f30b112d033ce2e621b34f3',
             service_url='https://qasecommerce.cielo.com.br/servicos/ecommwsec.do',
         )
 
 
-class MonolithicTestCase(TestCase):
+class ClientResponseTest(TestCase):
     def test_process_response(self):
         response = self.client.process_response(
             u"""<?xml version="1.0" encoding="ISO-8859-1"?>
@@ -201,7 +188,6 @@ class MonolithicTestCase(TestCase):
                     <nsu>336508</nsu>
                   </autorizacao>
                 </transacao>""".encode('iso-8859-1'))
-        self.assertTrue(response.success)
         self.assertIsInstance(response, cielo.Transaction)
         self.assertEqual(response.status, 5)
 
@@ -212,40 +198,27 @@ class MonolithicTestCase(TestCase):
                     <codigo>032</codigo>
                     <mensagem>Valor de captura inválido</mensagem>
                 </erro>""".encode('iso-8859-1'))
-        self.assertFalse(response.success)
         self.assertIsInstance(response, cielo.Error)
         self.assertEqual(response.code, 32)
         self.assertEqual(response.message, u"Valor de captura inválido")
 
-    def test_transaction(self):
-        order = cielo.Order(
-            value=Decimal('200.0'),
-            datetime=datetime.datetime.now(),
-            number='1',
-        )
-        payment = cielo.Payment(
-            brand=cielo.VISA,
-            value=order.value,
-            datetime=order.datetime,
-            installments=1,
-        )
-        card = cielo.CardData(
+    @unittest.skip("this is just how I want the API to look like. it's not working yet")
+    def test_create_payment(self):
+        card = cielo.Card(
             number='4551870000000183',
             expiration_date=nextmonth(),
             security_code='123',
             holder_name='Joao da Silva',
         )
 
-        response = self.client.create_transaction(
+        payment = self.client.create_payment(
+            value=Decimal('200.0'),
             card=card,
-            order=order,
-            payment=payment,
-            authorize=3,
-            capture=True,
-            return_url='http://example.com',
         )
 
-        self.assertTrue(response.success)
+        self.assertTrue(payment.order)
+        self.assertTrue(payment.transaction)
+        self.assertTrue(payment.created_at)
 
 """
 As informações abaixo podem ser usadas pelo desenvolvedor durante o desenvolvimento da
