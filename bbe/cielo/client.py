@@ -4,14 +4,10 @@ import urllib2
 import contextlib
 from bbe.cielo import message
 from bbe.cielo.schema import (
+    SERVICE_VERSION,
+    Error,
+    Transaction,
     TransactionRequestSchema,
-    INFORMADO,
-    INEXISTENTE,
-    DEBITO,
-    CREDITO_A_VISTA,
-    PARCELADO_ADMINISTRADORA,
-    guess_response_schema,
-    DebitPayment,
 )
 
 
@@ -41,57 +37,27 @@ class Client(object):
     def generate_transaction_id(self):
         return str(uuid.uuid4())
 
-    def create_transaction(self, order, card, payment, authorize, capture, return_url=None):
-        if card.security_code is None:
-            code_indic = INEXISTENTE
-        else:
-            code_indic = INFORMADO
-            # TODO: support other security_code indices
-
-        if isinstance(payment, DebitPayment):
-            product = DEBITO
-        elif payment.installments == 1:
-            product = CREDITO_A_VISTA
-        else:
-            product = PARCELADO_ADMINISTRADORA
-            # TODO suportar parcelado_administradora
-
+    def create_transaction(self, order, payment, authorize, capture, card=None, return_url=None):
         appstruct = {
             'id': self.generate_transaction_id(),
-            'version': '1.1.1',
+            'version': SERVICE_VERSION,
             'establishment': {
                 'number': self.store_id,
                 'key': self.store_key,
             },
-            'order': {
-                'number': order.number,
-                'value': order.value,
-                'currency': order.currency,
-                'datetime': order.datetime,
-                'description': order.description,
-                'language': order.language,
-            },
-            'payment': {
-                'brand': payment.brand,
-                'product': product,
-                'installments': payment.installments,
-            },
+            'order': order.serialize(),
+            'payment': payment.serialize(),
             'return_url': return_url,
             'authorize': authorize,
             'capture': capture,
         }
 
         if card is not None:
-            appstruct['holder'] = {
-                'number': card.number,
-                'security_code': card.security_code,
-                'security_code_indicator': code_indic,
-                'expiration_date': card.expiration_date,
-                'holder_name': card.holder_name,
-            }
+            appstruct['holder'] = card.serialize()
             appstruct['bin'] =  card.number[:6]
 
         schema = TransactionRequestSchema(tag='requisicao-transacao')
+
         cstruct = schema.serialize(appstruct)
         request = message.serialize(schema, cstruct)
         request = message.dumps(request)
@@ -99,7 +65,6 @@ class Client(object):
 
     def post_request(self, request):
         msg = u"mensagem=" + request
-        #TODO msg = msg.encode('iso-')
 
         try:
             request = urllib2.urlopen(self.service_url, msg)
@@ -112,19 +77,18 @@ class Client(object):
 
     def process_response(self, response):
         response = message.loads(response)
-
-        # get the root type
         root_tag = message.get_root_tag(response)
 
-        # let's try to guess the response content-type
-        schema = guess_response_schema(root_tag)
-
-        if schema is None:
+        if root_tag == 'erro':
+            response_cls = Error
+        elif root_tag == 'transacao':
+            response_cls = Transaction
+        else:
+            # TODO shouldn't this be named UnexpectedResponse
             raise UnknownResponse("Unknown response type '%s'" % root_tag)
 
-        # TODO specialized exception class?
+        schema = response_cls.__schema__
         cstruct = message.deserialize(schema, response)
-        response = schema.deserialize(cstruct)
-        response = schema.content_type.deserialize(response)
+        appstruct = schema.deserialize(cstruct)
 
-        return response
+        return response_cls.from_appstruct(appstruct)

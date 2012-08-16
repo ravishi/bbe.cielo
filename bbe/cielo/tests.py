@@ -141,6 +141,17 @@ class MoneyTestCase(unittest.TestCase):
         self.assertRaises(colander.Invalid, self.node.serialize, Decimal('200.543'))
 
 
+class ContentTypeTest(unittest.TestCase):
+    def test_order(self):
+        order = cielo.Order(number='12345',
+                            value=Decimal('100'),
+                            datetime=datetime.datetime.now(),
+                            description='Description',
+                            currency=cielo.DEFAULT_CURRENCY,
+                            language=cielo.DEFAULT_LANGUAGE)
+        appstruct = order.serialize()
+        self.assertEqual(appstruct, order._validate(appstruct))
+
 # do not trust these
 
 class TestCase(unittest.TestCase):

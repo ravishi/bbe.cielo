@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import inspect
 import datetime
 import colander
 from decimal import Decimal
@@ -13,6 +12,8 @@ LANG_EN = 'EN'
 LANG_ES = 'ES'
 
 LANGUAGES = (LANG_PT, LANG_EN, LANG_ES)
+
+DEFAULT_LANGUAGE = LANG_PT
 
 
 MASTERCARD = 'mastercard'
@@ -69,75 +70,12 @@ STATUS = (
 DEFAULT_CURRENCY = '096'
 
 
-class Order(object):
-    def __init__(self, value, number, datetime, description=None,
-                 currency=DEFAULT_CURRENCY, language='PT'):
-        self.value = value
-        self.number = number
-        self.datetime = datetime
-        self.currency = currency
-        self.description = description
-        self.language = language
+def gettag(node):
+    return getattr(node, 'tag', node.name)
 
 
-class Payment(object):
-    def __init__(self, value, datetime, installments, brand):
-        self.value = value
-        self.datetime = datetime
-        self.installments = installments
-        self.brand = brand
-
-
-class CardData(object):
-    def __init__(self, number, holder_name, expiration_date, security_code):
-        self.number = number
-        self.holder_name = holder_name
-        self.expiration_date = expiration_date
-        self.security_code = security_code
-
-
-class DebitPayment(Payment):
-    def __init__(self, *args, **kwargs):
-        kwargs.setdefault('installments', 1)
-        super(Payment, self).__init__(*args, **kwargs)
-
-
-class ContentType(object):
-    pass
-
-
-class Response(object):
-    @property
-    def success(self):
-        return not isinstance(self, Error)
-
-
-class Transaction(Response):
-    def __init__(self, order, status, authentication=None,
-                 authorization=None, capture=None, cancel=None, pan=None):
-        self.order = order
-        #self.payment = payment
-        self.status = status
-        self.authentication = authentication
-        self.authorization = authorization
-        self.capture = capture
-        self.cancel = cancel
-        self.pan = pan
-
-    @classmethod
-    def deserialize(cls, appstruct):
-        order = Order(**appstruct['order'])
-        return cls(order=order, status=appstruct['status'])
-
-
-class Error(Response):
-    def __init__(self, code, message):
-        self.code = code
-        self.message = message
-
-    @classmethod
-    def deserialize(cls, appstruct):
-        return cls(**appstruct)
+def isattrib(node):
+    return getattr(node, 'attrib', False)
 
 
 class SecurityCodeIndicator(colander.Integer):
@@ -348,8 +286,8 @@ class OrderSchema(colander.Schema):
                                       missing=colander.null)
     language = colander.SchemaNode(colander.String(),
                                    tag='idioma',
-                                   missing='PT',
-                                   defaults='PT',
+                                   missing=DEFAULT_LANGUAGE,
+                                   defaults=DEFAULT_LANGUAGE,
                                    validator=colander.OneOf(LANGUAGES))
 
 
@@ -402,7 +340,6 @@ class AuthenticationSchema(colander.Schema):
     eci         N   2       Nível de segurança.
     """
     tag = 'autenticacao'
-    content_type = Authentication
 
     code = colander.SchemaNode(colander.Integer(), tag='codigo')
     message = colander.SchemaNode(colander.String(), tag='mensagem')
@@ -427,20 +364,18 @@ class AuthorizationSchema(colander.Schema):
                             só está disponível em transações autorizadas.
     """
     tag = 'autorizacao'
-    content_type = Authorization
 
-    code = colander.SchemaNode(colander.Integer(),
-                               tag='code',
+    code = colander.SchemaNode(colander.String(),
+                               tag='codigo',
                                validator=colander.Length(max=2))
-    mensagem = colander.SchemaNode(colander.String(),
+    message = colander.SchemaNode(colander.String(),
                                    tag='mensagem',
                                    validator=colander.Length(max=1000))
-    data = colander.SchemaNode(DateTime(), tag='data-hora')
-    valor = colander.SchemaNode(Money(),
+    datetime = colander.SchemaNode(DateTime(), tag='data-hora')
+    value = colander.SchemaNode(Money(),
                                 tag='valor',
                                 validator=colander.Range(max=Decimal('9'*10 + '.99')))
-    lr = colander.SchemaNode(colander.Integer(),
-                             validator=colander.Length(max=2))
+    lr = colander.SchemaNode(colander.Integer())
     nsu = colander.SchemaNode(colander.String(),
                               validator=colander.Length(max=6))
     arp = colander.SchemaNode(colander.String(),
@@ -458,7 +393,6 @@ class CaptureSchema(colander.Schema):
                             dois últimos dígitos são os centavos.
     """
     tag = 'captura'
-    content_type = Capture
 
     code = colander.SchemaNode(colander.Integer(), tag='codigo')
     message = colander.SchemaNode(colander.String(), tag='mensagem')
@@ -491,7 +425,7 @@ class RootNode(colander.Schema):
 
 
 class TransactionRequestSchema(RootNode):
-    tag = 'transacao'
+    tag = 'requisicao-transacao'
 
     establishment = EstablishmentSchema(tag='dados-ec')
     holder = CardHolderSchema(tag='dados-portador', missing=colander.null)
@@ -557,7 +491,6 @@ class CaptureRequestNode(RootNode):
 
 class ErrorSchema(colander.Schema):
     tag = 'erro'
-    content_type = Error
 
     code = colander.SchemaNode(colander.Integer(), tag='codigo')
     message = colander.SchemaNode(colander.String(), tag='mensagem')
@@ -565,7 +498,6 @@ class ErrorSchema(colander.Schema):
 
 class TransactionSchema(RootNode):
     tag = 'transacao'
-    content_type = Transaction
 
     tid = colander.SchemaNode(colander.String())
     order = OrderSchema(tag='dados-pedido')
@@ -581,13 +513,161 @@ class TransactionSchema(RootNode):
                                              missing=colander.null)
 
 
-def guess_response_schema(tag):
-    from bbe.cielo import schema
-    members = inspect.getmembers(schema)
-    for (name, value) in members:
-        if not isinstance(value, type):
-            continue
-        if not issubclass(value, colander.Schema):
-            continue
-        if getattr(value, 'tag', None) == tag:
-            return value(tag=value.tag, content_type=value.content_type)
+class ContentType(object):
+    """A content type is something that can be serialized into an appstruct.
+    It must have an associated schema.
+    """
+    __schema__ = None
+
+    def serialize(self):
+        return self._serialize()
+
+    def _serialize(self, nodes=None, validate=True):
+        schema = self.__schema__
+
+        if schema is None:
+            raise TypeError("%s cannot be serialized, as it dont't declare a schema" % (
+                self.__class__.__name__,))
+
+        appstruct = {}
+
+        for node in schema:
+            name = node.name
+
+            if nodes and name in nodes:
+                continue
+
+            value = getattr(self, name, None)
+            if value is None:
+                value = colander.null
+
+            if isinstance(value, ContentType):
+                value = value.serialize()
+
+            appstruct[name] = value
+
+        if validate:
+            appstruct = self._validate(appstruct)
+
+        return appstruct
+
+    @classmethod
+    def _validate(cls, appstruct):
+        schema = cls.__schema__
+        return schema.deserialize(schema.serialize(appstruct))
+
+    @classmethod
+    def deserialize(cls, appstruct):
+        appstruct = cls._validate(appstruct)
+        return cls(**appstruct)
+
+
+class Order(ContentType):
+    __schema__ = OrderSchema()
+
+    def __init__(self, value, number, datetime, description=None,
+                 currency=DEFAULT_CURRENCY, language=DEFAULT_LANGUAGE):
+        self.value = value
+        self.number = number
+        self.datetime = datetime
+        self.currency = currency
+        self.description = description
+        self.language = language
+
+
+class Payment(ContentType):
+    __schema__ = PaymentSchema()
+
+    def __init__(self, brand, value, installments, datetime):
+        self.brand = brand
+        self.value = value
+        self.installments = installments
+        self.datetime = datetime
+
+    @property
+    def product(self):
+        if self.installments == 1:
+            return CREDITO_A_VISTA
+        else:
+            return PARCELADO_ADMINISTRADORA
+        # TODO: support PARCELADO_LOJA
+
+
+class DebitPayment(Payment):
+    def __init__(self, brand, value, datetime):
+        self.brand = brand
+        self.value = value
+        self.datetime = datetime
+
+    @property
+    def installments(self):
+        return 1
+
+    @property
+    def product(self):
+        return DEBITO
+
+
+class CardData(ContentType):
+    __schema__ = CardHolderSchema()
+
+    def __init__(self, number, holder_name, expiration_date, security_code):
+        self.number = number
+        self.holder_name = holder_name
+        self.expiration_date = expiration_date
+        self.security_code = security_code
+
+    @property
+    def security_code_indicator(self):
+        if self.security_code is None:
+            return INEXISTENTE
+        else:
+            return INFORMADO
+        # TODO: support other indicators
+
+
+class Authentication(ContentType):
+    def __init__(self, code, datetime, value, eci, message):
+        self.code = code
+        self.datetime = datetime
+        self.value = value
+        self.eci = eci
+        self.message = message
+
+
+class Response(ContentType):
+    """The client returns responses. They have a ``success`` attribute
+    that can tell weather the requested operation succeded or not.
+    """
+    @property
+    def success(self):
+        return not isinstance(self, Error)
+
+
+class Error(Response):
+    __schema__ = ErrorSchema(tag='erro')
+
+    def __init__(self, code, message):
+        self.code = code
+        self.message = message
+
+    @staticmethod
+    def from_appstruct(appstruct):
+        return Error(code=appstruct['code'],
+                     message=appstruct['message'])
+
+
+class Transaction(Response):
+    __schema__ = TransactionSchema(tag='transacao')
+
+    def __init__(self, status, order):
+        self.status = status
+        self.order = order
+
+    @staticmethod
+    def from_appstruct(appstruct):
+        order = Order.deserialize(appstruct.pop('order'))
+        return Transaction(
+            status=appstruct['status'],
+            order=order,
+        )

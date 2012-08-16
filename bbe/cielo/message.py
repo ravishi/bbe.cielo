@@ -2,19 +2,12 @@ import re
 import colander
 import contextlib
 from lxml import etree
+from .schema import gettag, isattrib
 
 try:
     from cStringIO import StringIO
 except:
     from StringIO import StringIO
-
-
-def isattrib(node):
-    return getattr(node, 'attrib', False)
-
-
-def gettag(node):
-    return getattr(node, 'tag', node.name)
 
 
 def _build_element(node):
