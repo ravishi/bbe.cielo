@@ -89,8 +89,7 @@ def dumps(tree):
         s =  sio.getvalue()
         # XXX xml.etree.ElementTree does like ' />', while lxml.etree
         # does like '/>'. we don't know which one we'll use, so...
-        s.replace(' />', '/>')
-        return s
+        return s.replace(' />', '/>')
 
 
 def loads(data):
