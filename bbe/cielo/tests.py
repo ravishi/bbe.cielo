@@ -149,6 +149,7 @@ class TestCase(unittest.TestCase):
             store_id='1006993069',
             store_key='25fbb99741c739dd84d7b06ec78c9bac718838630f30b112d033ce2e621b34f3',
             service_url='https://qasecommerce.cielo.com.br/servicos/ecommwsec.do',
+            default_installment_type=cielo.PARCELADO_ADMINISTRADORA,
         )
 
 
@@ -190,35 +191,39 @@ class ClientResponseTest(TestCase):
                 </transacao>""".encode('iso-8859-1'))
         self.assertIsInstance(response, cielo.Transaction)
         self.assertEqual(response.status, 5)
+        self.assertFalse(response.authenticated)
 
     def test_process_error_response(self):
         response = self.client.process_response(
             u"""<?xml version="1.0" encoding="ISO-8859-1"?>
                 <erro>
-                    <codigo>032</codigo>
-                    <mensagem>Valor de captura inválido</mensagem>
+                  <codigo>032</codigo>
+                  <mensagem>Valor de captura inválido</mensagem>
                 </erro>""".encode('iso-8859-1'))
         self.assertIsInstance(response, cielo.Error)
         self.assertEqual(response.code, 32)
         self.assertEqual(response.message, u"Valor de captura inválido")
 
-    @unittest.skip("this is just how I want the API to look like. it's not working yet")
-    def test_create_payment(self):
+    def test_credit_payment(self):
         card = cielo.Card(
+            brand='visa',
             number='4551870000000183',
             expiration_date=nextmonth(),
             security_code='123',
             holder_name='Joao da Silva',
         )
-
         payment = self.client.create_payment(
             value=Decimal('200.0'),
             card=card,
+            installments=1,
+            authorize=3,
+            capture=False,
         )
 
+        self.assertIsInstance(payment, cielo.Transaction)
+        self.assertTrue(payment.tid)
         self.assertTrue(payment.order)
-        self.assertTrue(payment.transaction)
-        self.assertTrue(payment.created_at)
+        self.assertTrue(payment.datetime)
 
 """
 As informações abaixo podem ser usadas pelo desenvolvedor durante o desenvolvimento da

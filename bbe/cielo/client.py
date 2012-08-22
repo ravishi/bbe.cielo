@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import datetime
 import uuid
+import hashlib
 import urllib2
 import contextlib
 from bbe.cielo import message
@@ -31,15 +32,16 @@ class Error(object):
 
 
 class Transaction(object):
-    def __init__(self, tid, order, store, value, currency, language, brand,
-                 installments, product, status, pan, description=None,
-                 authentication=None, authorization=None, capture=None,
-                 cancel=None, authentication_url=None):
+    def __init__(self, tid, order, store, value, currency, datetime,
+                 language, brand, installments, product, status, pan,
+                 description=None, authentication=None, authorization=None,
+                 capture=None, cancel=None, authentication_url=None):
         self.tid = tid
         self.order = order
         self.store = store
         self.value = value
         self.currency = currency
+        self.datetime = datetime
         self.language = language
         self.brand = brand
         self.installments = installments
@@ -53,11 +55,11 @@ class Transaction(object):
         self.authentication_url = authentication_url
 
     @property
-    def authorized(self):
+    def authenticated(self):
         pass
 
     @property
-    def authenticated(self):
+    def authorized(self):
         pass
 
     @property
@@ -66,7 +68,8 @@ class Transaction(object):
 
 
 class Card(object):
-    def __init__(self, number, holder_name, expiration_date, security_code=None):
+    def __init__(self, brand, number, holder_name, expiration_date, security_code=None):
+        self.brand = brand
         self.number = number
         self.holder_name = holder_name
         self.expiration_date = expiration_date
@@ -74,36 +77,58 @@ class Card(object):
 
 
 class Client(object):
-    def __init__(self, store_id, store_key, service_url,
+    def __init__(self, store_id, store_key, default_installment_type,
+                 service_url=schemas.SERVICE_URL,
                  default_currency=schemas.DEFAULT_CURRENCY,
                  default_language=schemas.DEFAULT_LANGUAGE):
         self.store_id = store_id
         self.store_key = store_key
         self.service_url = service_url
+        self.default_installment_type = default_installment_type
         self.default_currency = default_currency
         self.default_language = default_language
 
     def generate_request_id(self):
         return str(uuid.uuid4())
 
-    def create_payment(self, value, card, installments, authorize, capture,
-                       created_at=None, description=None, currency=None,
-                       language=None):
+    def generate_order_number(self):
+        return hashlib.sha1(str(uuid.uuid4())).hexdigest()[:20]
+
+    def create_payment(self, value, card, installments, authorize,
+                       capture, created_at=None, description=None,
+                       currency=None, language=None, installment_type=None,
+                       return_url=None, product=None):
         currency = currency or self.default_currency
         language = language or self.default_language
 
-        # TODO is this really necessary?
-        return_url = 'http://example.com'
-
         created_at = created_at or datetime.datetime.now()
+
+        # TODO is this really necessary?
+        return_url = return_url or 'http://example.com'
 
         if not isinstance(card, Card):
             brand = card
         else:
+            brand = card.brand
+
             if card.security_code is None:
-                card_indicator = schemas.INDISPONIVEL
+                card_indicator = schemas.SC_NAO_INFORMADO
             else:
-                card_indicator = schemas.DISPONIVEL
+                card_indicator = schemas.SC_INFORMADO
+                # TODO: support more indicator types
+
+        if product is not None:
+            # validate the specified product
+            if product in (schemas.CREDITO_A_VISTA, schemas.DEBITO):
+                if installments != 1:
+                    raise ValueError("Inconsistent `installment`, `product` pair")
+            elif installments == 1:
+                raise ValueError("Inconsistent `installment`, `product` pair")
+        else:
+            if installments == 1:
+                product = schemas.CREDITO_A_VISTA
+            else:
+                product = installment_type or self.default_installment_type
 
         # the order id
         oid = self.generate_order_number()
@@ -136,10 +161,10 @@ class Client(object):
         if isinstance(card, Card):
             appstruct['holder'] = {
                 'number': card.number,
-                'indicator': card_indicator,
                 'holder_name': card.holder_name,
                 'expiration_date': card.expiration_date,
                 'security_code': card.security_code,
+                'security_code_indicator': card_indicator,
             }
             appstruct['bin'] =  card.number[:6]
 
@@ -185,6 +210,7 @@ class Client(object):
         return Transaction(
             tid=appstruct['tid'],
             store=self.store_id,
+            datetime=order['datetime'],
             order=order['number'],
             value=order['value'],
             currency=order['currency'],

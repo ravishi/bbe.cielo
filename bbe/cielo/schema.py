@@ -3,8 +3,9 @@ import datetime
 import colander
 from decimal import Decimal
 
-
 SERVICE_VERSION = '1.1.1'
+
+SERVICE_URL = 'https://ecommerce.cbmp.com.br/servicos/ecommwsec.do'
 
 
 LANG_PT = 'PT'
@@ -37,33 +38,33 @@ PRODUCTS = (
     DEBITO,
 )
 
-NAO_INFORMADO = 'nao-informado'
-ILEGIVEL = 'ilegivel'
-INEXISTENTE = 'inexistente'
-INFORMADO = 'informado'
+SC_NAO_INFORMADO = 'nao-informado'
+SC_ILEGIVEL = 'ilegivel'
+SC_INEXISTENTE = 'inexistente'
+SC_INFORMADO = 'informado'
 
-ST_CRIADA = 0
-ST_EM_ANDAMENTO = 1
-ST_AUTENTICADA = 2
-ST_NAO_AUTENTICADA = 3
-ST_AUTORIZADA = 4
-ST_NAO_AUTORIZADA = 5
-ST_CAPTURADA = 6
-ST_NAO_CAPTURADA = 8
-ST_CANCELADA = 9
-ST_EM_AUTENTICACAO = 10
+ST_CREATED = 0
+ST_PROCESSING = 1
+ST_AUTHENTICATED = 2
+ST_NOT_AUTHENTICATED = 3
+ST_AUTHORIZED = 4
+ST_NOT_AUTHORIZED = 5
+ST_CAPTURED = 6
+ST_NOT_CAPTURED = 8
+ST_CANCELLED = 9
+ST_AUTHENTICATING = 10
 
 STATUS = (
-    ST_CRIADA,
-    ST_EM_ANDAMENTO,
-    ST_AUTENTICADA,
-    ST_NAO_AUTENTICADA,
-    ST_AUTORIZADA,
-    ST_NAO_AUTORIZADA,
-    ST_CAPTURADA,
-    ST_NAO_CAPTURADA,
-    ST_CANCELADA,
-    ST_EM_AUTENTICACAO,
+    ST_CREATED,
+    ST_PROCESSING,
+    ST_AUTHENTICATED,
+    ST_NOT_AUTHENTICATED,
+    ST_AUTHORIZED,
+    ST_NOT_AUTHORIZED,
+    ST_CAPTURED,
+    ST_NOT_CAPTURED,
+    ST_CANCELLED,
+    ST_AUTHENTICATING,
 )
 
 
@@ -80,10 +81,10 @@ def isattrib(node):
 
 class SecurityCodeIndicator(colander.Integer):
     map = dict((
-        (NAO_INFORMADO, 0),
-        (INFORMADO, 1),
-        (ILEGIVEL, 2),
-        (INEXISTENTE, 9),
+        (SC_NAO_INFORMADO, 0),
+        (SC_INFORMADO, 1),
+        (SC_ILEGIVEL, 2),
+        (SC_INEXISTENTE, 9),
     ))
     _rmap = dict((b, a) for (a, b) in map.iteritems())
 
@@ -108,8 +109,7 @@ class SecurityCodeIndicator(colander.Integer):
 
 
 class Money(colander.Decimal):
-    """
-    Serializes python numeric values.
+    """Serializes python numeric values.
 
     Note that valid monetary values should not have more than two
     decimal places.
