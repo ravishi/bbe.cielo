@@ -191,7 +191,6 @@ class ClientResponseTest(TestCase):
                 </transacao>""".encode('iso-8859-1'))
         self.assertIsInstance(response, cielo.Transaction)
         self.assertEqual(response.status, 5)
-        self.assertFalse(response.authenticated)
 
     def test_process_error_response(self):
         response = self.client.process_response(

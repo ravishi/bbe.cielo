@@ -54,18 +54,6 @@ class Transaction(object):
         self.capture = capture
         self.authentication_url = authentication_url
 
-    @property
-    def authenticated(self):
-        pass
-
-    @property
-    def authorized(self):
-        pass
-
-    @property
-    def cancelled(self):
-        return self.status == schemas.ST_CANCELADA
-
 
 class Card(object):
     def __init__(self, brand, number, holder_name, expiration_date, security_code=None):
