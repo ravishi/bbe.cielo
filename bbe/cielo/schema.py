@@ -320,7 +320,7 @@ class PaymentSchema(colander.Schema):
                                   validator=colander.OneOf(PRODUCTS))
     installments = colander.SchemaNode(colander.Integer(),
                                        tag='parcelas',
-                                       validator=colander.Range(1, 999))
+                                       validator=colander.Range(max=999))
 
 
 class EstablishmentSchema(colander.Schema):
@@ -374,21 +374,13 @@ class AuthorizationSchema(colander.Schema):
     """
     tag = 'autorizacao'
 
-    code = colander.SchemaNode(colander.Integer(), tag='codigo',
-                               validator=colander.Range(max=99))
-    message = colander.SchemaNode(colander.String(),
-                                   tag='mensagem',
-                                   validator=colander.Length(max=1000))
+    code = colander.SchemaNode(colander.Integer(), tag='codigo')
+    message = colander.SchemaNode(colander.String(), tag='mensagem')
     datetime = colander.SchemaNode(InconsistentDateTime(), tag='data-hora')
-    value = colander.SchemaNode(Money(),
-                                tag='valor',
-                                validator=colander.Range(max=Decimal('9'*10 + '.99')))
+    value = colander.SchemaNode(Money(), tag='valor')
     lr = colander.SchemaNode(colander.Integer())
-    nsu = colander.SchemaNode(colander.String(),
-                              validator=colander.Length(max=6))
-    arp = colander.SchemaNode(colander.String(),
-                              missing=colander.null,
-                              validator=colander.Length(max=6))
+    nsu = colander.SchemaNode(colander.String())
+    arp = colander.SchemaNode(colander.String(), missing=colander.null)
 
 
 class CaptureSchema(colander.Schema):
@@ -433,6 +425,28 @@ class RootNode(colander.Schema):
 
 
 class TransactionRequestSchema(RootNode):
+    """ requisicao-transacao
+
+    dados-ec.numero         N   R   1..20   Número de afiliação da loja com a Cielo.
+    dados-ec.chave          AN  R   1..100  Chave de acesso da loja atribuída pela Cielo.
+    dados-portador          n/a O   n/a     Nó com dados do cartão.
+    dados-pedido            n/a R   n/a     Nó com dados do pedido.
+    forma-pagamento         n/a R   n/a     Nó com a forma de pagamento.
+    url-retorno             AN  R   1..1024 URL da página de retorno. É para essa tela que o
+                                            fluxo será retornado ao fim da autenticação e/ou
+                                            autorização.
+    autorizar               N   R   1       Indicador de autorização automática:
+                                                - 0 (não autorizar)
+                                                - 1 (autorizar somente se autenticada)
+                                                - 2 (autorizar autenticada e nãoautenticada)
+                                                - 3 (autorizar sem passar por autenticação –
+                                                     válido somente para crédito)
+                                             OBS: Para Diners, Discover e Elo, o valor será sempre 3.
+    capturar                A   R   n/a     [true|false]. Define se a transação será
+                                            automaticamente capturada caso seja autorizada.
+    campo-livre             AN  O   0..128  Campo livre.
+    bin                     N   O   6       Seis primeiros números do cartão.
+    """
     tag = 'requisicao-transacao'
 
     establishment = EstablishmentSchema(tag='dados-ec')
@@ -505,6 +519,18 @@ class ErrorSchema(colander.Schema):
 
 
 class TransactionSchema(RootNode):
+    """ <transacao/>
+    tid                     AN  1..40   Identificador.
+    dados-pedido                        Idêntico ao nó enviado pela loja na criação da transação.
+    forma-pagamento                     Idêntico ao nó enviado pela loja na criação da transação.
+    status                  N   1..2    Status.
+    autenticacao                        Nó com dados da autenticação caso tenha passado por essa etapa.
+    autorizacao                         Nó com dados da autorização caso tenha passado por essa etapa.
+    captura                             Nó com dados da captura caso tenha passado por essa etapa.
+    cancelamento                        Nó com dados do cancelamento caso tenha passado por essa etapa.
+    pan                     AN  1..40   Hash do número do cartão do portador.
+    url-autenticacao        AN  1..256  URL de redirecionamento à Cielo
+    """
     tag = 'transacao'
 
     tid = colander.SchemaNode(colander.String())
