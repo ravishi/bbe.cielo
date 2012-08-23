@@ -219,6 +219,9 @@ class ClientResponseTest(TestCase):
             capture=False,
         )
 
+        if isinstance(payment, cielo.Error):
+            print payment.message
+
         self.assertIsInstance(payment, cielo.Transaction)
         self.assertTrue(payment.tid)
         self.assertTrue(payment.order)
@@ -244,5 +247,4 @@ Loja
  1006993069 25fbb99741c739dd84d7b06ec78c9bac718838630f30b112d033ce2e621b34f3
 Cielo
  1001734898 e84827130b9837473681c2787007da5914d6359947015a5cdb2b8843db0fa832
-
 """

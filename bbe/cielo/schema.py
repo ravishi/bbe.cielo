@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 import datetime
 import colander
 from decimal import Decimal
@@ -170,62 +171,70 @@ class Money(colander.Decimal):
         return super(Money, self).deserialize(node, cstruct)
 
 
-class BaseDateTime(colander.SchemaType):
+class Month(colander.SchemaType):
+    """Serializes dates into '%Y%m' strings representing months.
+
+    Obviously, the ``day`` attribute of input dates will be ignored.
+
+    The ``day`` of deserialized values will always ``1``.
+
+    Also, it's good to note that I don't know how this will deal
+    with timezones and so. I just use ``strftime`` and ``strptime``.
+    """
     err_template =  "Invalid date"
-    format = None
+    _format = '%Y%m'
 
     def serialize(self, node, appstruct):
         if not appstruct:
             return colander.null
 
-        if type(appstruct) is datetime.date: # cant use isinstance; dt subs date
-            appstruct = datetime.datetime.combine(appstruct, datetime.time())
-
-        if not isinstance(appstruct, datetime.datetime):
+        if not isinstance(appstruct, datetime.date):
             raise colander.Invalid(node, '"%s" is not a datetime object' % appstruct)
 
-        return appstruct.strftime(self.format)
+        return appstruct.strftime(self._format)
 
     def deserialize(self, node, cstruct):
         if not cstruct:
             return colander.null
         try:
-            result = self._strptime(cstruct)
+            return datetime.date.strptime(cstruct, self._format)
         except ValueError:
             raise colander.Invalid(node, self.err_template)
 
-        return result
 
-    def _strptime(self, cstruct):
-        """
-        Deve levantar ValueError caso a estrutura seja inválida.
-        """
-        return datetime.datetime.strptime(cstruct, self.format)
+class InconsistentDateTime(colander.DateTime):
+    """ The webservice ONLY support an inconsistent datetime format.
+    Their format is almost like ISO8601, but not exactly. Turns out that
+    it doesn't support timezone information on input data, but all their
+    returned data has a timezone information. The returned timezone is
+    not documented anywhere, so I'll implement exactly the same crazy
+    inconsitent datetime object here.
 
+    *BE WARNED!* This means that your input datetime objects should not
+    have any timezone information, while the returned data WILL HAVE
+    timezone information. To ignore the returned information is up to
+    you.
+    """
+    _tzinfo_regex = re.compile(r"(Z|(([-+])([0-9]{2}):([0-9]{2})))?$")
 
-class DateTime(BaseDateTime):
-    format = "%Y-%m-%dT%H:%M:%S"
+    def __init__(self):
+        super(InconsistentDateTime, self).__init__(None)
 
-    def _strptime(self, cstruct):
-        # XXX nas respostas da Cielo, os timestamps contém milisegundos
-        # e timezone. precisamos tratar isso.
-        try:
-            return super(DateTime, self)._strptime(cstruct)
-        except ValueError:
-            dt, extra = cstruct.split('.', 1)
-            ts = super(DateTime, self)._strptime(dt)
+    def serialize(self, node, appstruct):
+        if appstruct is colander.null:
+            return colander.null
 
-            # FIXME vamos fazer nosso melhor para carregar o timestamp de
-            # forma correta, mas vamos ignorar o timezone
-            ms, tz = extra.split('-')
-            ts += datetime.timedelta(milliseconds=int(ms))
-            return ts
+        cstruct = super(InconsistentDateTime, self).serialize(node, appstruct)
 
+        if cstruct is colander.null:
+            return colander.null
 
-class Month(BaseDateTime):
-    err_template =  "Invalid month"
-    format = "%Y%m"
-    extended_format = None
+        # if it has any timezone information, we raise an error. if you don't
+        # like it, complain with Cielo.
+        if self._tzinfo_regex.match(cstruct):
+            raise colander.Invalid(node, "datetimes with timezone information are not supported")
+
+        return cstruct
 
 
 class CardHolderSchema(colander.Schema):
@@ -279,7 +288,7 @@ class OrderSchema(colander.Schema):
                                     max=Decimal('9999999999.99')
                                 ))
     currency = colander.SchemaNode(colander.String(), tag='moeda') # TODO OneOf
-    datetime = colander.SchemaNode(DateTime(), tag='data-hora')
+    datetime = colander.SchemaNode(InconsistentDateTime(), tag='data-hora')
     description = colander.SchemaNode(colander.String(),
                                       tag='descricao',
                                       validator=colander.Length(max=1024),
@@ -343,7 +352,7 @@ class AuthenticationSchema(colander.Schema):
 
     code = colander.SchemaNode(colander.Integer(), tag='codigo')
     message = colander.SchemaNode(colander.String(), tag='mensagem')
-    datetime = colander.SchemaNode(DateTime(), tag='data-hora')
+    datetime = colander.SchemaNode(InconsistentDateTime(), tag='data-hora')
     value = colander.SchemaNode(Money(), tag='valor')
     eci = colander.SchemaNode(colander.Integer())
 
@@ -371,7 +380,7 @@ class AuthorizationSchema(colander.Schema):
     message = colander.SchemaNode(colander.String(),
                                    tag='mensagem',
                                    validator=colander.Length(max=1000))
-    datetime = colander.SchemaNode(DateTime(), tag='data-hora')
+    datetime = colander.SchemaNode(InconsistentDateTime(), tag='data-hora')
     value = colander.SchemaNode(Money(),
                                 tag='valor',
                                 validator=colander.Range(max=Decimal('9'*10 + '.99')))
@@ -396,7 +405,7 @@ class CaptureSchema(colander.Schema):
 
     code = colander.SchemaNode(colander.Integer(), tag='codigo')
     message = colander.SchemaNode(colander.String(), tag='mensagem')
-    date = colander.SchemaNode(DateTime(), tag='data-hora')
+    date = colander.SchemaNode(InconsistentDateTime(), tag='data-hora')
     value = colander.SchemaNode(Money(), tag='valor')
 
 
@@ -413,7 +422,7 @@ class CancelSchema(colander.Schema):
 
     code = colander.SchemaNode(colander.Integer(), tag='codigo')
     message = colander.SchemaNode(colander.String(), tag='mensagem')
-    date = colander.SchemaNode(DateTime(), tag='data-hora')
+    date = colander.SchemaNode(InconsistentDateTime(), tag='data-hora')
     value = colander.SchemaNode(Money(), tag='valor')
 
 
