@@ -374,9 +374,8 @@ class AuthorizationSchema(colander.Schema):
     """
     tag = 'autorizacao'
 
-    code = colander.SchemaNode(colander.String(),
-                               tag='codigo',
-                               validator=colander.Length(max=2))
+    code = colander.SchemaNode(colander.Integer(), tag='codigo',
+                               validator=colander.Range(max=99))
     message = colander.SchemaNode(colander.String(),
                                    tag='mensagem',
                                    validator=colander.Length(max=1000))
