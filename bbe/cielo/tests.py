@@ -191,6 +191,7 @@ class ClientResponseTest(TestCase):
                 </transacao>""".encode('iso-8859-1'))
         self.assertIsInstance(response, cielo.Transaction)
         self.assertEqual(response.status, 5)
+        self.assertEqual(response.authorization.code, 5)
 
     def test_process_error_response(self):
         response = self.client.process_response(
@@ -218,9 +219,6 @@ class ClientResponseTest(TestCase):
             authorize=3,
             capture=False,
         )
-
-        if isinstance(payment, cielo.Error):
-            print payment.message
 
         self.assertIsInstance(payment, cielo.Transaction)
         self.assertTrue(payment.tid)

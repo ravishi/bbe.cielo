@@ -31,11 +31,33 @@ class Error(object):
         self.code = code
 
 
+class ObjectLikeDict(dict):
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
+
+
 class Transaction(object):
     def __init__(self, tid, order, store, value, currency, datetime,
                  language, brand, installments, product, status, pan,
                  description=None, authentication=None, authorization=None,
                  capture=None, cancel=None, authentication_url=None):
+
+        # convert all dict objects to an object-like dict
+        if authorization:
+            authorization = ObjectLikeDict(authorization)
+
+        if authentication:
+            authentication = ObjectLikeDict(authentication)
+
+        if capture:
+            capture = ObjectLikeDict(capture)
+
+        if cancel:
+            cancel = ObjectLikeDict(cancel)
+
         self.tid = tid
         self.order = order
         self.store = store
