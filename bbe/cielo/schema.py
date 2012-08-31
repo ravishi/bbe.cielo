@@ -69,7 +69,7 @@ STATUS = (
 )
 
 
-DEFAULT_CURRENCY = '096'
+DEFAULT_CURRENCY = '986'
 
 
 def gettag(node):

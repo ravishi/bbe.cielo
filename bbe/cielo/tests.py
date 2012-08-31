@@ -85,6 +85,7 @@ class MessageDeserializationTestCase(unittest.TestCase):
         node.add(colander.SchemaNode(colander.String(), name='c', missing=colander.null))
         self.assertLoads(node, '<node/>', {'a': colander.null, 'b': colander.null, 'c': colander.null})
 
+
 class MoneyTestCase(unittest.TestCase):
     def setUp(self):
         self.node = colander.SchemaNode(cielo.Money())
