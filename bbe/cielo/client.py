@@ -186,10 +186,10 @@ class Client(object):
         return  self.post_request(request)
 
     def post_request(self, request):
-        msg = u"mensagem=" + request
+        data = 'mensagem=' + request
 
         try:
-            request = urllib2.urlopen(self.service_url, msg)
+            request = urllib2.urlopen(self.service_url, data)
             with contextlib.closing(request) as response:
                 response = response.read()
         except urllib2.URLError, e:
