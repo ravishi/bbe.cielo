@@ -182,7 +182,7 @@ class Client(object):
         schema = schemas.TransactionRequestSchema(tag='requisicao-transacao')
         cstruct = schema.serialize(appstruct)
         etree = message.serialize(schema, cstruct)
-        request = message.dumps(etree)
+        request = message.dumps(etree, encoding='ISO-8859-1')
         return  self.post_request(request)
 
     def post_request(self, request):

@@ -1,13 +1,7 @@
 import re
 import colander
-import contextlib
 from lxml import etree
 from .schema import gettag, isattrib
-
-try:
-    from cStringIO import StringIO
-except:
-    from StringIO import StringIO
 
 
 def _build_element(node):
@@ -83,13 +77,8 @@ def _deserialize_mapping(schema, element):
     return cstruct
 
 
-def dumps(tree):
-    with contextlib.closing(StringIO()) as sio:
-        tree.write(sio)
-        s =  sio.getvalue()
-        # XXX xml.etree.ElementTree does like ' />', while lxml.etree
-        # does like '/>'. we don't know which one we'll use, so...
-        return s.replace(' />', '/>')
+def dumps(tree, encoding=None):
+    return etree.tostring(tree.getroot(), encoding=encoding)
 
 
 def loads(data):
