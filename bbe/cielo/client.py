@@ -21,7 +21,7 @@ class CommunicationError(urllib2.URLError):
 
 class UnknownResponse(Exception):
     """This is raised when our client don't know how to handle
-    the response.
+    the response. I don't think it'll ever be used.
     """
 
 
