@@ -4,6 +4,7 @@ import uuid
 import hashlib
 import urllib2
 import contextlib
+from colander import null
 from bbe.cielo import message
 from bbe.cielo import schema as schemas
 
@@ -31,6 +32,15 @@ class Error(object):
         self.code = code
 
 
+def get_object_like(appstruct, key, default=None):
+    value = appstruct.get(key, default)
+    if value is null:
+        value = default
+    else:
+        value = ObjectLikeDict(value)
+    return value
+
+
 class ObjectLikeDict(dict):
     def __getattr__(self, name):
         try:
@@ -44,19 +54,6 @@ class Transaction(object):
                  language, brand, installments, product, status, pan,
                  description=None, authentication=None, authorization=None,
                  capture=None, cancel=None, authentication_url=None):
-
-        # convert all dict objects to an object-like dict
-        if authorization:
-            authorization = ObjectLikeDict(authorization)
-
-        if authentication:
-            authentication = ObjectLikeDict(authentication)
-
-        if capture:
-            capture = ObjectLikeDict(capture)
-
-        if cancel:
-            cancel = ObjectLikeDict(cancel)
 
         self.tid = tid
         self.order = order
@@ -231,9 +228,9 @@ class Client(object):
             product=payment['product'],
             status=status,
             pan=appstruct['pan'],
-            authentication=appstruct.get('authentication'),
+            authentication=get_object_like(appstruct, 'authentication'),
             authentication_url=appstruct['authentication_url'],
-            authorization=appstruct.get('authorization'),
-            capture=appstruct.get('capture'),
-            cancel=appstruct.get('cancel'),
+            authorization=get_object_like(appstruct, 'authorization'),
+            capture=get_object_like(appstruct, 'capture'),
+            cancel=get_object_like(appstruct, 'cancel'),
         )
