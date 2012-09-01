@@ -227,9 +227,9 @@ class ClientResponseTest(TestCase):
         self.assertTrue(payment.datetime)
 
 """
-As informações abaixo podem ser usadas pelo desenvolvedor durante o desenvolvimento da
-integração.
-Cartão com autenticação: 4012001037141112 (visa)
+As informações abaixo podem ser usadas pelo desenvolvedor durante
+o desenvolvimento da integração. Cartão com autenticação:
+    4012001037141112 (visa)
 Cartão sem autenticação: 4551870000000183 (visa), 5453010000066167 (mastercard),
 6362970000457013 (elo), 36490102462661 (diners) e 6011020000245045 (discover).
 Data de validade: qualquer posterior ao corrente

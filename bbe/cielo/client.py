@@ -20,12 +20,6 @@ class CommunicationError(urllib2.URLError):
     """
 
 
-class UnknownResponse(Exception):
-    """This is raised when our client don't know how to handle
-    the response. I don't think it'll ever be used.
-    """
-
-
 class Error(object):
     def __init__(self, message, code):
         self.message = message
@@ -203,7 +197,8 @@ class Client(object):
         elif root_tag == 'transacao':
             schema = schemas.TransactionSchema()
         else:
-            raise UnknownResponse("Unexpected response '%s'" % root_tag)
+            # the service only returns errors or transactions.
+            raise ValueError("Invalid response: %s" % root_tag)
 
         cstruct = message.deserialize(schema, etree)
         appstruct = schema.deserialize(cstruct)
