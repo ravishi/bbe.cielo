@@ -117,6 +117,11 @@ class MoneyTestCase(unittest.TestCase):
         self.assertSerialize(Decimal('123.5'), '12350')
         self.assertSerialize(Decimal('123.56'), '12356')
 
+    def test_decimal_with_lots_of_zeroes_serialization(self):
+        "We should ignore useless zeroes of decimal values"
+        self.assertSerialize(Decimal('1.00000000'), '100')
+        self.assertSerialize(Decimal('1.23000'), '123')
+
     def test_deserialization(self):
         self.assertDeserialize('43200', Decimal('432.00'))
         self.assertDeserialize('87720', Decimal('877.2'))

@@ -154,6 +154,8 @@ class Money(colander.Decimal):
                 i = str(cstruct)
                 d = '00'
 
+            d = d.rstrip('0')
+
             if len(d) > 2:
                 raise colander.Invalid(node,
                     ('"%s" is not a valid Money value because it has'
