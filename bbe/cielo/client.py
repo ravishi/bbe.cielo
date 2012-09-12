@@ -95,6 +95,36 @@ class Client(object):
     def generate_order_number(self):
         return hashlib.sha1(str(uuid.uuid4())).hexdigest()[:20]
 
+    def query_by_tid(self, tid):
+        schema = schemas.QuerySchema(tag='requisicao-consulta')
+        cstruct = schema.serialize({
+            'id': self.generate_request_id(),
+            'version': schemas.SERVICE_VERSION,
+            'establishment': {
+                'number': self.store_id,
+                'key': self.store_key,
+            },
+            'tid': tid,
+        })
+        etree = message.serialize(schema, cstruct)
+        request = message.dumps(etree, encoding='ISO-8859-1')
+        return  self.post_request(request)
+
+    def query_by_order_number(self, order_number):
+        schema = schemas.OrderQuerySchema(tag='requisicao-consulta-chsec')
+        cstruct = schema.serialize({
+            'id': self.generate_request_id(),
+            'version': schemas.SERVICE_VERSION,
+            'establishment': {
+                'number': self.store_id,
+                'key': self.store_key,
+            },
+            'order_number': order_number,
+        })
+        etree = message.serialize(schema, cstruct)
+        request = message.dumps(etree, encoding='ISO-8859-1')
+        return  self.post_request(request)
+
     def create_transaction(self, value, card, installments, authorize,
                            capture, created_at=None, description=None,
                            currency=None, language=None, installment_type=None,
