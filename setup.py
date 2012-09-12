@@ -13,7 +13,7 @@ long_description = (
     open('CHANGES.txt').read()
     + '\n')
 
-requires = ['colander', 'lxml']
+requires = ['colander']
 
 setup(name='bbe.cielo',
       version=version,

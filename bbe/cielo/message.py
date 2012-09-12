@@ -1,7 +1,11 @@
 import re
 import colander
-from lxml import etree
 from .schema import gettag, isattrib
+
+try:
+    import xml.etree.cElementTree as etree
+except ImportError:
+    import xml.etree.ElementTree as etree
 
 
 def _build_element(node):
@@ -78,7 +82,11 @@ def _deserialize_mapping(schema, element):
 
 
 def dumps(tree, encoding=None):
-    return etree.tostring(tree.getroot(), encoding=encoding)
+    s = etree.tostring(tree.getroot(), encoding=encoding)
+    # XXX xml.etree.ElementTree uses a space on self-closing tags, while lxml's
+    # etree doesn't. since i'll be doing tests with both of them, i'll stick
+    # with one default.
+    return s.replace(' />', '/>')
 
 
 def loads(data):
