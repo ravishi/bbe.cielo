@@ -63,7 +63,7 @@ class Transaction(object):
         self.pan = pan
         self.authorization = authorization
         self.authentication = authentication
-        self.calcel = cancel
+        self.cancel = cancel
         self.capture = capture
         self.authentication_url = authentication_url
 
