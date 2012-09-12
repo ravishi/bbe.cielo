@@ -95,10 +95,10 @@ class Client(object):
     def generate_order_number(self):
         return hashlib.sha1(str(uuid.uuid4())).hexdigest()[:20]
 
-    def create_payment(self, value, card, installments, authorize,
-                       capture, created_at=None, description=None,
-                       currency=None, language=None, installment_type=None,
-                       return_url=None, product=None):
+    def create_transaction(self, value, card, installments, authorize,
+                           capture, created_at=None, description=None,
+                           currency=None, language=None, installment_type=None,
+                           return_url=None, product=None):
         currency = currency or self.default_currency
         language = language or self.default_language
 

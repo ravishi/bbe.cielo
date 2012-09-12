@@ -218,7 +218,7 @@ class ClientResponseTest(TestCase):
             security_code='123',
             holder_name='Joao da Silva',
         )
-        payment = self.client.create_payment(
+        payment = self.client.create_transaction(
             value=Decimal('200.0'),
             card=card,
             installments=1,
