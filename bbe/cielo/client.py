@@ -20,10 +20,24 @@ class CommunicationError(urllib2.URLError):
     """
 
 
-class Error(object):
+class Error(Exception):
+    code = None
+
     def __init__(self, message, code):
         self.message = message
         self.code = code
+        super(Error, self).__init__(self.message)
+
+    @staticmethod
+    def get_error_class(code):
+        for cls in Error.__subclasses__():
+            if getattr(cls, 'code', None) == code:
+                return cls
+        return Error
+
+
+class TimeoutError(Error):
+    code = 98
 
 
 def get_object_like(appstruct, key, default=None):
@@ -128,7 +142,7 @@ class Client(object):
     def create_transaction(self, value, card, installments, authorize,
                            capture, created_at=None, description=None,
                            currency=None, language=None, installment_type=None,
-                           return_url=None, product=None):
+                           return_url=None, product=None, order_number=None):
         currency = currency or self.default_currency
         language = language or self.default_language
 
@@ -161,8 +175,8 @@ class Client(object):
             else:
                 product = installment_type or self.default_installment_type
 
-        # the order id
-        oid = self.generate_order_number()
+        if order_number is None:
+            order_number = self.generate_order_number()
 
         appstruct = {
             'id': self.generate_request_id(),
@@ -172,7 +186,7 @@ class Client(object):
                 'key': self.store_key,
             },
             'order': {
-                'number': oid,
+                'number': order_number,
                 'value': value,
                 'currency': currency,
                 'description': description,
@@ -234,7 +248,8 @@ class Client(object):
         appstruct = schema.deserialize(cstruct)
 
         if root_tag == 'erro':
-            return Error(appstruct['message'], code=appstruct['code'])
+            error_class = Error.get_error_class(appstruct['code'])
+            raise error_class(**appstruct)
 
         order = appstruct['order']
         payment = appstruct['payment']

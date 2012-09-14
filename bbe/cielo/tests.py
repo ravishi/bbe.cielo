@@ -200,15 +200,13 @@ class ClientResponseTest(TestCase):
         self.assertEqual(response.authorization.code, 5)
 
     def test_process_error_response(self):
-        response = self.client.process_response(
-            u"""<?xml version="1.0" encoding="ISO-8859-1"?>
-                <erro>
-                  <codigo>032</codigo>
-                  <mensagem>Valor de captura inválido</mensagem>
-                </erro>""".encode('iso-8859-1'))
-        self.assertIsInstance(response, cielo.Error)
-        self.assertEqual(response.code, 32)
-        self.assertEqual(response.message, u"Valor de captura inválido")
+        response = u"""<?xml version="1.0" encoding="ISO-8859-1"?>
+                         <erro>
+                         <codigo>032</codigo>
+                         <mensagem>Valor de captura inválido</mensagem>
+                       </erro>""".encode('iso-8859-1')
+
+        self.assertRaises(cielo.Error, self.client.process_response, response)
 
     def test_credit_payment(self):
         card = cielo.Card(
