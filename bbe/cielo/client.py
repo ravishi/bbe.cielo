@@ -21,10 +21,23 @@ class CommunicationError(urllib2.URLError):
 
 
 class Error(Exception):
+    code = None
+
     def __init__(self, message, code):
         self.message = message
         self.code = code
         super(Error, self).__init__(self.message)
+
+    @staticmethod
+    def get_error_class(code):
+        for cls in Error.__subclasses__():
+            if getattr(cls, 'code', None) == code:
+                return cls
+        return Error
+
+
+class TimeoutError(Error):
+    code = 98
 
 
 def get_object_like(appstruct, key, default=None):
@@ -235,7 +248,8 @@ class Client(object):
         appstruct = schema.deserialize(cstruct)
 
         if root_tag == 'erro':
-            raise Error(**appstruct)
+            error_class = Error.get_error_class(appstruct['code'])
+            raise error_class(**appstruct)
 
         order = appstruct['order']
         payment = appstruct['payment']
