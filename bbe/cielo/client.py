@@ -126,6 +126,11 @@ class Client(object):
             'tid': tid,
         })
 
+    def capture_transaction(self, tid):
+        return self._do_request('requisicao-captura', {
+            'tid': tid,
+        })
+
     def create_transaction(self, value, card, installments, authorize,
                            capture, created_at=None, description=None,
                            currency=None, language=None, installment_type=None,

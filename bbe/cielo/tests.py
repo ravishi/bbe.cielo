@@ -267,6 +267,11 @@ class QueryTestCase(TestCase):
         self.assertEqual(payment.tid, self.payment.tid)
         self.assertEqual(payment.status, cielo.ST_CANCELLED)
 
+    def test_capture(self):
+        transaction = self.client.capture_transaction(self.payment.tid)
+        self.assertEqual(transaction.tid, self.payment.tid)
+        self.assertEqual(transaction.status, cielo.ST_CAPTURED)
+
 """
 As informações abaixo podem ser usadas pelo desenvolvedor durante
 o desenvolvimento da integração. Cartão com autenticação:
