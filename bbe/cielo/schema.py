@@ -518,6 +518,10 @@ class CancelRequestSchema(RootNode):
     dados-ec.numero N   R   1..20   Número de afiliação da loja com a Cielo
     dados-ec.chave  AN  R   1..100  Chave de acesso da loja atribuída pela Cielo
     tid             AN  R   1..40   Identificador da transação.
+
+    Regras
+    Aplicável somente para transação autorizada ou capturada
+    Deve ser solicitado no mesmo dia da autorização
     """
     tag = 'cancel-request'
     tid = colander.SchemaNode(colander.String(), validator=colander.Length(max=40))

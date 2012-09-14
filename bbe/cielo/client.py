@@ -109,50 +109,42 @@ class Client(object):
     def generate_order_number(self):
         return hashlib.sha1(str(uuid.uuid4())).hexdigest()[:20]
 
-    def query_by_tid(self, tid):
-        schema = schemas.QuerySchema(tag='requisicao-consulta')
-        cstruct = schema.serialize({
+    def _get_establishment_appstruct(self):
+        return {'number': self.store_id, 'key': self.store_key}
+
+    def create_request(self, schema, appstruct):
+        appstruct.update({
             'id': self.generate_request_id(),
             'version': schemas.SERVICE_VERSION,
             'establishment': {
                 'number': self.store_id,
                 'key': self.store_key,
             },
+        })
+        cstruct = schema.serialize(appstruct)
+        etree = message.serialize(schema, cstruct)
+        return message.dumps(etree, encoding='ISO-8859-1')
+
+    def query_by_tid(self, tid):
+        schema = schemas.QuerySchema(tag='requisicao-consulta')
+        request = self.create_request(schema, {
             'tid': tid,
         })
-        etree = message.serialize(schema, cstruct)
-        request = message.dumps(etree, encoding='ISO-8859-1')
-        return  self.post_request(request)
+        return self.post_request(request)
 
     def query_by_order_number(self, order_number):
         schema = schemas.OrderQuerySchema(tag='requisicao-consulta-chsec')
-        cstruct = schema.serialize({
-            'id': self.generate_request_id(),
-            'version': schemas.SERVICE_VERSION,
-            'establishment': {
-                'number': self.store_id,
-                'key': self.store_key,
-            },
+        request = self.create_request(schema, {
             'order_number': order_number,
         })
-        etree = message.serialize(schema, cstruct)
-        request = message.dumps(etree, encoding='ISO-8859-1')
-        return  self.post_request(request)
+        return self.post_request(request)
 
     def cancel_transaction(self, tid):
         schema = schemas.CancelRequestSchema(tag='requisicao-cancelamento')
-        cstruct = schema.serialize({
-            'id': self.generate_request_id(),
-            'version': schemas.SERVICE_VERSION,
-            'establishment': {
-                'number': self.store_id,
-                'key': self.store_key,
-            },
+        request = self.create_request(schema, {
             'tid': tid,
         })
-        etree = message.serialize(schema, cstruct)
-        request = message.dumps(etree, encoding='ISO-8859-1')
-        return  self.post_request(request)
+        return self.post_request(request)
 
     def create_transaction(self, value, card, installments, authorize,
                            capture, created_at=None, description=None,
@@ -194,12 +186,6 @@ class Client(object):
             order_number = self.generate_order_number()
 
         appstruct = {
-            'id': self.generate_request_id(),
-            'version': schemas.SERVICE_VERSION,
-            'establishment': {
-                'number': self.store_id,
-                'key': self.store_key,
-            },
             'order': {
                 'number': order_number,
                 'value': value,
@@ -228,12 +214,9 @@ class Client(object):
             }
             appstruct['bin'] =  card.number[:6]
 
-        # TODO move this 'tag' thing to the schema, where it belongs
         schema = schemas.TransactionRequestSchema(tag='requisicao-transacao')
-        cstruct = schema.serialize(appstruct)
-        etree = message.serialize(schema, cstruct)
-        request = message.dumps(etree, encoding='ISO-8859-1')
-        return  self.post_request(request)
+        request = self.create_request(schema, appstruct)
+        return self.post_request(request)
 
     def post_request(self, request):
         data = 'mensagem=' + request
