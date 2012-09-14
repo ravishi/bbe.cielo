@@ -426,7 +426,14 @@ class RootNode(colander.Schema):
     version = colander.SchemaNode(colander.String(), tag='versao', attrib=True)
 
 
-class TransactionRequestSchema(RootNode):
+class RequestSchema(RootNode):
+    """ Marker class for request schemas.
+    """
+    # all request schemas must declare a tag
+    tag = None
+
+
+class TransactionRequestSchema(RequestSchema):
     """ requisicao-transacao
 
     dados-ec.numero         N   R   1..20   Número de afiliação da loja com a Cielo.
@@ -461,7 +468,7 @@ class TransactionRequestSchema(RootNode):
     bin = colander.SchemaNode(colander.String(), tag='bin', missing=colander.null)
 
 
-class QuerySchema(RootNode):
+class QuerySchema(RequestSchema):
     """Funcionalidade de extrema importância na integração.
     É através dela que a loja virtual obtém uma “foto” da
     transação. É sempre utilizada após a loja ter recebido o
@@ -476,7 +483,7 @@ class QuerySchema(RootNode):
     establishment = EstablishmentSchema(tag='dados-ec')
 
 
-class OrderQuerySchema(RootNode):
+class OrderQuerySchema(RequestSchema):
     """
     numero-pedido   NA  R   1...20  Número do Pedido associado à Transação
     """
@@ -488,7 +495,7 @@ class OrderQuerySchema(RootNode):
     establishment = EstablishmentSchema(tag='dados-ec')
 
 
-class CaptureRequestNode(RootNode):
+class CaptureRequestSchema(RequestSchema):
     """Schema da requisição de captura.
 
     dados-ec.numero N   R   1..20   Número de afiliação da loja com a Cielo
@@ -513,7 +520,7 @@ class CaptureRequestNode(RootNode):
     establishment = EstablishmentSchema(tag='dados-ec')
 
 
-class CancelRequestSchema(RootNode):
+class CancelRequestSchema(RequestSchema):
     """ Nó raiz  <requisicao-cancelamento/>
     dados-ec.numero N   R   1..20   Número de afiliação da loja com a Cielo
     dados-ec.chave  AN  R   1..100  Chave de acesso da loja atribuída pela Cielo
@@ -523,7 +530,7 @@ class CancelRequestSchema(RootNode):
     Aplicável somente para transação autorizada ou capturada
     Deve ser solicitado no mesmo dia da autorização
     """
-    tag = 'cancel-request'
+    tag = 'requisicao-cancelamento'
     tid = colander.SchemaNode(colander.String(), validator=colander.Length(max=40))
     establishment = EstablishmentSchema(tag='dados-ec')
 
@@ -562,3 +569,7 @@ class TransactionSchema(RootNode):
     authentication_url = colander.SchemaNode(colander.String(),
                                              tag='url-autenticacao',
                                              missing=colander.null)
+
+
+def _compile_request_schemas():
+    return dict((schema.tag, schema(tag=schema.tag)) for schema in RequestSchema.__subclasses__())

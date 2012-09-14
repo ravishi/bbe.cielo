@@ -92,6 +92,8 @@ class Card(object):
 
 
 class Client(object):
+    _request_schema_map = schemas._compile_request_schemas()
+
     def __init__(self, store_id, store_key, default_installment_type,
                  service_url=schemas.SERVICE_URL,
                  default_currency=schemas.DEFAULT_CURRENCY,
@@ -109,42 +111,20 @@ class Client(object):
     def generate_order_number(self):
         return hashlib.sha1(str(uuid.uuid4())).hexdigest()[:20]
 
-    def _get_establishment_appstruct(self):
-        return {'number': self.store_id, 'key': self.store_key}
-
-    def create_request(self, schema, appstruct):
-        appstruct.update({
-            'id': self.generate_request_id(),
-            'version': schemas.SERVICE_VERSION,
-            'establishment': {
-                'number': self.store_id,
-                'key': self.store_key,
-            },
-        })
-        cstruct = schema.serialize(appstruct)
-        etree = message.serialize(schema, cstruct)
-        return message.dumps(etree, encoding='ISO-8859-1')
-
     def query_by_tid(self, tid):
-        schema = schemas.QuerySchema(tag='requisicao-consulta')
-        request = self.create_request(schema, {
+        return self._do_request('requisicao-consulta', {
             'tid': tid,
         })
-        return self.post_request(request)
 
     def query_by_order_number(self, order_number):
-        schema = schemas.OrderQuerySchema(tag='requisicao-consulta-chsec')
-        request = self.create_request(schema, {
+        return self._do_request('requisicao-consulta-chsec', {
             'order_number': order_number,
         })
-        return self.post_request(request)
 
     def cancel_transaction(self, tid):
-        schema = schemas.CancelRequestSchema(tag='requisicao-cancelamento')
-        request = self.create_request(schema, {
+        return self._do_request('requisicao-cancelamento', {
             'tid': tid,
         })
-        return self.post_request(request)
 
     def create_transaction(self, value, card, installments, authorize,
                            capture, created_at=None, description=None,
@@ -214,9 +194,7 @@ class Client(object):
             }
             appstruct['bin'] =  card.number[:6]
 
-        schema = schemas.TransactionRequestSchema(tag='requisicao-transacao')
-        request = self.create_request(schema, appstruct)
-        return self.post_request(request)
+        return self._do_request('requisicao-transacao', appstruct)
 
     def post_request(self, request):
         data = 'mensagem=' + request
@@ -272,3 +250,25 @@ class Client(object):
             capture=get_object_like(appstruct, 'capture'),
             cancel=get_object_like(appstruct, 'cancel'),
         )
+
+    def _do_request(self, tag, data):
+        request = self._build_request(tag, data)
+        return self.post_request(request)
+
+    def _build_request(self, tag, appstruct):
+        appstruct.update({
+            'id': self.generate_request_id(),
+            'version': schemas.SERVICE_VERSION,
+            'establishment': {
+                'number': self.store_id,
+                'key': self.store_key,
+            },
+        })
+
+        schema = self._request_schema_map.get(tag)
+        if schema is None:
+            raise ValueError(u"invalid request tag: `%s'" % tag)
+
+        cstruct = schema.serialize(appstruct)
+        etree = message.serialize(schema, cstruct)
+        return message.dumps(etree, encoding='ISO-8859-1')
