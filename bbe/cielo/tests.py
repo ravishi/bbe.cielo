@@ -205,25 +205,6 @@ class ClientResponseTest(TestCase):
                 <erro>
                   <codigo>032</codigo>
                   <mensagem>Valor de captura inválido</mensagem>
-        card = cielo.Card(
-            brand='visa',
-            number='4551870000000183',
-            expiration_date=nextmonth(),
-            security_code='123',
-            holder_name='Joao da Silva',
-        )
-        payment = self.client.create_transaction(
-            value=Decimal('200.0'),
-            card=card,
-            installments=1,
-            authorize=3,
-            capture=False,
-        )
-
-        self.assertIsInstance(payment, cielo.Transaction)
-        self.assertTrue(payment.tid)
-        self.assertTrue(payment.order)
-        self.assertTrue(payment.datetime)
                 </erro>""".encode('iso-8859-1'))
         self.assertIsInstance(response, cielo.Error)
         self.assertEqual(response.code, 32)
@@ -231,7 +212,7 @@ class ClientResponseTest(TestCase):
 
     def test_credit_payment(self):
         card = cielo.Card(
-            brand='visa',
+            brand=cielo.VISA,
             number='4551870000000183',
             expiration_date=nextmonth(),
             security_code='123',
@@ -256,7 +237,7 @@ class QueryTestCase(TestCase):
         super(QueryTestCase, self).setUp()
 
         card = cielo.Card(
-            brand='visa',
+            brand=cielo.VISA,
             number='4551870000000183',
             expiration_date=nextmonth(),
             security_code='123',
@@ -271,7 +252,6 @@ class QueryTestCase(TestCase):
         )
 
         assert isinstance(self.payment, cielo.Transaction)
-        assert self.payment.status == cielo.ST_AUTHORIZED
         assert self.payment.tid
         assert self.payment.order
 
