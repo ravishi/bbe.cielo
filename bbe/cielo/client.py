@@ -20,10 +20,11 @@ class CommunicationError(urllib2.URLError):
     """
 
 
-class Error(object):
+class Error(Exception):
     def __init__(self, message, code):
         self.message = message
         self.code = code
+        super(Error, self).__init__(self.message)
 
 
 def get_object_like(appstruct, key, default=None):
@@ -234,7 +235,7 @@ class Client(object):
         appstruct = schema.deserialize(cstruct)
 
         if root_tag == 'erro':
-            return Error(appstruct['message'], code=appstruct['code'])
+            raise Error(**appstruct)
 
         order = appstruct['order']
         payment = appstruct['payment']

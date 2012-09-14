@@ -200,34 +200,13 @@ class ClientResponseTest(TestCase):
         self.assertEqual(response.authorization.code, 5)
 
     def test_process_error_response(self):
-        response = self.client.process_response(
-            u"""<?xml version="1.0" encoding="ISO-8859-1"?>
-                <erro>
-                  <codigo>032</codigo>
-                  <mensagem>Valor de captura inválido</mensagem>
-        card = cielo.Card(
-            brand='visa',
-            number='4551870000000183',
-            expiration_date=nextmonth(),
-            security_code='123',
-            holder_name='Joao da Silva',
-        )
-        payment = self.client.create_transaction(
-            value=Decimal('200.0'),
-            card=card,
-            installments=1,
-            authorize=3,
-            capture=False,
-        )
+        response = u"""<?xml version="1.0" encoding="ISO-8859-1"?>
+                         <erro>
+                         <codigo>032</codigo>
+                         <mensagem>Valor de captura inválido</mensagem>
+                       </erro>""".encode('iso-8859-1')
 
-        self.assertIsInstance(payment, cielo.Transaction)
-        self.assertTrue(payment.tid)
-        self.assertTrue(payment.order)
-        self.assertTrue(payment.datetime)
-                </erro>""".encode('iso-8859-1'))
-        self.assertIsInstance(response, cielo.Error)
-        self.assertEqual(response.code, 32)
-        self.assertEqual(response.message, u"Valor de captura inválido")
+        self.assertRaises(cielo.Error, self.client.process_response, response)
 
     def test_credit_payment(self):
         card = cielo.Card(
