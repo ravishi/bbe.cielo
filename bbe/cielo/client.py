@@ -142,7 +142,7 @@ class Client(object):
     def create_transaction(self, value, card, installments, authorize,
                            capture, created_at=None, description=None,
                            currency=None, language=None, installment_type=None,
-                           return_url=None, product=None):
+                           return_url=None, product=None, order_number=None):
         currency = currency or self.default_currency
         language = language or self.default_language
 
@@ -175,8 +175,8 @@ class Client(object):
             else:
                 product = installment_type or self.default_installment_type
 
-        # the order id
-        oid = self.generate_order_number()
+        if order_number is None:
+            order_number = self.generate_order_number()
 
         appstruct = {
             'id': self.generate_request_id(),
@@ -186,7 +186,7 @@ class Client(object):
                 'key': self.store_key,
             },
             'order': {
-                'number': oid,
+                'number': order_number,
                 'value': value,
                 'currency': currency,
                 'description': description,
