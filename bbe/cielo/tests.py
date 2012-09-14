@@ -262,6 +262,11 @@ class QueryTestCase(TestCase):
         self.assertEqual(payment.tid, self.payment.tid)
         self.assertEqual(payment.order, self.payment.order)
 
+    def test_cancel(self):
+        payment = self.client.cancel_transaction(self.payment.tid)
+        self.assertEqual(payment.tid, self.payment.tid)
+        self.assertEqual(payment.status, cielo.ST_CANCELLED)
+
 """
 As informações abaixo podem ser usadas pelo desenvolvedor durante
 o desenvolvimento da integração. Cartão com autenticação:

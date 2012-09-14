@@ -513,6 +513,17 @@ class CaptureRequestNode(RootNode):
     establishment = EstablishmentSchema(tag='dados-ec')
 
 
+class CancelRequestSchema(RootNode):
+    """ Nó raiz  <requisicao-cancelamento/>
+    dados-ec.numero N   R   1..20   Número de afiliação da loja com a Cielo
+    dados-ec.chave  AN  R   1..100  Chave de acesso da loja atribuída pela Cielo
+    tid             AN  R   1..40   Identificador da transação.
+    """
+    tag = 'cancel-request'
+    tid = colander.SchemaNode(colander.String(), validator=colander.Length(max=40))
+    establishment = EstablishmentSchema(tag='dados-ec')
+
+
 class ErrorSchema(colander.Schema):
     tag = 'erro'
 

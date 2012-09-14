@@ -139,6 +139,21 @@ class Client(object):
         request = message.dumps(etree, encoding='ISO-8859-1')
         return  self.post_request(request)
 
+    def cancel_transaction(self, tid):
+        schema = schemas.CancelRequestSchema(tag='requisicao-cancelamento')
+        cstruct = schema.serialize({
+            'id': self.generate_request_id(),
+            'version': schemas.SERVICE_VERSION,
+            'establishment': {
+                'number': self.store_id,
+                'key': self.store_key,
+            },
+            'tid': tid,
+        })
+        etree = message.serialize(schema, cstruct)
+        request = message.dumps(etree, encoding='ISO-8859-1')
+        return  self.post_request(request)
+
     def create_transaction(self, value, card, installments, authorize,
                            capture, created_at=None, description=None,
                            currency=None, language=None, installment_type=None,
