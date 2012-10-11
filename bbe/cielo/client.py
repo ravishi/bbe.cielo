@@ -19,13 +19,17 @@ class CommunicationError(urllib2.URLError):
         another exception.
     """
 
+    def __init__(self, *args, **kwargs):
+        self.order_number = kwargs.pop('order_number')
+        super(CommunicationError, self).__init__(*args, **kwargs)
+
 
 class Error(Exception):
     code = None
 
-    def __init__(self, message, code):
-        self.message = message
+    def __init__(self, message, code, order_number):
         self.code = code
+        self.order_number = order_number
         super(Error, self).__init__(self.message)
 
     @staticmethod
@@ -230,7 +234,7 @@ class Client(object):
 
         if root_tag == 'erro':
             error_class = Error.get_error_class(appstruct['code'])
-            raise error_class(**appstruct)
+            raise error_class(order_number=appstruct['order_number'], **appstruct)
 
         order = appstruct['order']
         payment = appstruct['payment']
