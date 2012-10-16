@@ -25,6 +25,7 @@ class Error(Exception):
 
     def __init__(self, message, code):
         self.code = code
+        self.message = message
         super(Error, self).__init__(self.message)
 
     @staticmethod
